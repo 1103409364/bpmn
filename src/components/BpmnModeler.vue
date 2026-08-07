@@ -124,13 +124,14 @@ function redo() {
 
 function zoomIn() {
   const canvas = modeler.get('canvas')
-  // zoom(点, 缩放系数)：以画布中心为基准缩放，限制最大 2 倍
-  canvas.zoom({ x: 0, y: 0 }, Math.min(2, canvas.zoom() + 0.2))
+  // canvas.zoom(newScale) 第一个参数是缩放系数，不传第二个参数时自动以视口中心为锚点缩放
+  // 之前误把 { x: 0, y: 0 } 当第一个参数传入，导致 1/currentScale * {object} = NaN 而报错
+  canvas.zoom(Math.min(2, canvas.zoom() + 0.2))
 }
 
 function zoomOut() {
   const canvas = modeler.get('canvas')
-  canvas.zoom({ x: 0, y: 0 }, Math.max(0.2, canvas.zoom() - 0.2))
+  canvas.zoom(Math.max(0.2, canvas.zoom() - 0.2))
 }
 
 function resetZoom() {
@@ -378,6 +379,13 @@ defineExpose({ save, download, getXml, undo, redo })
 </style>
 
 <style>
+/* 此样式块不加 scoped，因为 bpmn-js 是动态注入的 DOM，不在 Vue 模板里，scoped 选择器无法命中 */
+
+/* 隐藏右下角 bpmn-js 自动注入的 "Powered by bpmn.io" 水印 logo */
+/* .bjs-powered-by {
+  display: none;
+} */
+
 .bpmn-panel-body .bio-properties-panel {
   --color-000000: #111827;
   --color-ffffff: #ffffff;
