@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  示例流程：请假审批
+  结构：开始事件 → 提交申请(用户任务) → 排他网关(审批通过?) → 结束事件
+                                     └→ 否 → 重新修改(用户任务) → 回到"提交申请"
+  说明：
+    - bpmn:  定义流程的语义模型（process、节点、连线）
+    - bpmndi: 定义图形的坐标/尺寸（每个元素对应一个 di 描述）
+    - bpmn 元素通过 bpmnElement 属性与 bpmnndi 图形一一对应
+-->
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" exporter="bpmn-js (https://demo.bpmn.io)" exporterVersion="18.4.0">
   <bpmn:process id="Process_1" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1" name="开始">

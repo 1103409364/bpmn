@@ -1,68 +1,96 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+// bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。
+// 内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
 import BpmnModeler from 'bpmn-js/lib/Modeler'
+// 这三个是 bpmn-js 自带的样式：画布基础样式 + BPMN 图形样式 + 字体图标
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
+// ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理）
 import initialXml from '../assets/bpmn/initial.bpmn?raw'
 
+// 组件对外暴露的属性
 const props = defineProps({
+  // 父组件传入的 BPMN XML 字符串；为空时加载内置示例流程
   xml: {
     type: String,
     default: ''
   },
+  // 设计器顶部标题
   title: {
     type: String,
     default: ''
   }
 })
 
-const emit = defineEmits(['command-stack-changed', 'saved', 'exported'])
+const emit = defineEmits(['command-stack-changed', 'saved'])
 
+// 模板 ref：modeler 的容器(canvas)和属性面板挂载点(panel)由 Vue 渲染出来，再用原生 DOM 交给 bpmn-js
 const canvasRef = ref(null)
 const panelRef = ref(null)
+
+// modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
+// 保存后的流程 XML 字符串
 let bpmnXml = ''
 
+// 当前选中的元素信息（用于右侧属性面板头部展示）
 const activeElement = ref(null)
 const elementId = ref('')
 const elementType = ref('')
+// 撤销/重做按钮是否可用
 const canUndo = ref(false)
 const canRedo = ref(false)
 const isSaving = ref(false)
 
+/**
+ * 初始化 bpmn-js Modeler。
+ * 动态 import 两个包：它们体积较大，只在用到时加载，可以减小首屏体积。
+ */
 async function initModeler() {
-  const { BpmnPropertiesPanelModule, BpmnPropertiesPanelProvider } = await import(
-    'bpmn-js-properties-panel'
-  )
+  // BpmnPropertiesPanelModule：属性面板模块（additionalModules 注入到 modeler 中）
+  const { BpmnPropertiesPanelModule } = await import('bpmn-js-properties-panel')
+  // Camunda 的 moddle 扩展定义（JSON）：让属性面板能识别并编辑 camunda:* 扩展属性
   const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
 
+  // 创建 modeler 实例：
   modeler = new BpmnModeler({
+    // container: 画布挂载到哪个 DOM 元素（bpmn-js 会在此元素内渲染 svg 图形）
     container: canvasRef.value,
     propertiesPanel: {
+      // parent: 属性面板渲染到哪个 DOM 元素（挂在右侧面板内）
       parent: panelRef.value
     },
+    // additionalModules: 额外注册的模块，属性面板本身就是一个模块
     additionalModules: [BpmnPropertiesPanelModule],
+    // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     moddleExtensions: {
       camunda: camundaModdle
     }
   })
 
+  // importXML: 把 BPMN XML 字符串导入并渲染到画布（这是最核心的入口之一）
   try {
     await modeler.importXML(props.xml || initialXml)
   } catch (err) {
     console.error('导入流程失败:', err)
   }
 
+  // canvas service：负责图形的缩放、平移、视图定位
   const canvas = modeler.get('canvas')
-  canvas.zoom('fit-viewport')
+  canvas.zoom('fit-viewport') // 让整个流程图自动缩放并居中
 
+  // eventBus service：bpmn-js 的事件总线，所有交互都通过它发布/订阅事件
   const eventBus = modeler.get('eventBus')
+
+  // selection.changed：选中元素发生变化时触发，newSelection 是当前选中的元素数组
   eventBus.on('selection.changed', ({ newSelection }) => {
     const element = newSelection && newSelection[0]
     if (element) {
       activeElement.value = element
       elementId.value = element.id
+      // businessObject: 元素对应的 BPMN 业务模型对象，$type 如 'bpmn:UserTask'
       elementType.value = element.businessObject?.$type || ''
     } else {
       activeElement.value = null
@@ -71,6 +99,7 @@ async function initModeler() {
     }
   })
 
+  // commandStack.changed：任何编辑操作（增删改）发生后触发，借此刷新撤销/重做按钮
   eventBus.on('commandStack.changed', () => {
     updateCommandState()
     emit('command-stack-changed')
@@ -78,6 +107,7 @@ async function initModeler() {
   updateCommandState()
 }
 
+// commandStack service：记录所有编辑操作，提供撤销/重做
 function updateCommandState() {
   const stack = modeler.get('commandStack')
   canUndo.value = stack.canUndo()
@@ -94,6 +124,7 @@ function redo() {
 
 function zoomIn() {
   const canvas = modeler.get('canvas')
+  // zoom(点, 缩放系数)：以画布中心为基准缩放，限制最大 2 倍
   canvas.zoom({ x: 0, y: 0 }, Math.min(2, canvas.zoom() + 0.2))
 }
 
@@ -106,11 +137,15 @@ function resetZoom() {
   modeler.get('canvas').zoom('fit-viewport')
 }
 
+/**
+ * 保存流程：把画布上的所有改动序列化回 BPMN XML
+ * saveXML 是 importXML 的逆操作
+ */
 async function save() {
   if (!modeler) return
   isSaving.value = true
   try {
-    const { xml } = await modeler.saveXML({ format: true })
+    const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
     bpmnXml = xml
     emit('saved', xml)
   } catch (err) {
@@ -124,16 +159,19 @@ function getXml() {
   return bpmnXml
 }
 
+// 下载导出：type 为 'xml' 或 'svg'
 async function download(type) {
   if (type === 'xml') {
-    if (!bpmnXml) await save()
+    if (!bpmnXml) await save() // 还没保存过就先保存一次
     downloadBlob(new Blob([bpmnXml], { type: 'application/xml' }), 'diagram.bpmn')
   } else {
+    // saveSVG: 导出画布当前视图为 SVG 矢量图
     const { svg } = await modeler.saveSVG()
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg')
   }
 }
 
+// 通用浏览器文件下载工具函数
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -143,15 +181,18 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
+// onMounted 后再初始化：确保 canvasRef/panelRef 对应的 DOM 已经渲染到页面中
 onMounted(async () => {
   await nextTick()
   initModeler()
 })
 
+// 组件销毁时释放 modeler 实例，避免内存泄漏和事件残留
 onBeforeUnmount(() => {
   if (modeler) modeler.destroy()
 })
 
+// 暴露给父组件调用的方法
 defineExpose({ save, download, getXml, undo, redo })
 </script>
 

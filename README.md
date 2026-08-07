@@ -21,7 +21,7 @@ npm run preview   # 预览生产构建
 
 ## 项目结构
 
-```
+```txt
 bpmn/
 ├── index.html                     # 入口 HTML
 ├── package.json
