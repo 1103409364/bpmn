@@ -11,10 +11,8 @@ import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
 import initialXml from '../assets/bpmn/initial.bpmn?raw'
 // 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
 import 'diagram-js-accordion-palette/assets/index.css'
-// 自定义属性编辑器组件：展示/编辑当前选中元素的 taskInfo 条目
-import TaskInfoPanel from './properties/TaskInfoPanel.vue'
-// 基础信息编辑器组件：未选中元素时默认展示，编辑流程表单元数据
-import BasicInfoPanel from './properties/BasicInfoPanel.vue'
+// 属性编辑器组件：选中元素时编辑节点属性，未选中时编辑流程表单元数据
+import PropertyPanel from './properties/PropertyPanel.vue'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -443,13 +441,13 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
       <div class="bpmn-panel" v-show="modelerReady">
-        <TaskInfoPanel
-          v-if="activeElement"
+        <PropertyPanel
           :element="activeElement"
           :task-info="taskInfo"
+          :form-data="formDataLocal"
           @change="onTaskInfoChange"
+          @form-change="onFormDataChange"
         />
-        <BasicInfoPanel v-else :form-data="formDataLocal" @change="onFormDataChange" />
       </div>
     </div>
   </div>

@@ -1,11 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 
-// 属性编辑器组件：接收当前选中的 bpmn-js 元素与 taskInfo 数组，
-// 通过 element.id + element.$type 找到对应条目并渲染可编辑字段，
-// 任何修改通过 change 事件抛给父组件（父组件负责同步 taskInfo 与画布）。
+// 属性编辑器组件：合并了基础信息与节点属性编辑。
+// 选中流程节点时展示并编辑该节点的 taskInfo 条目；未选中时展示并编辑流程表单元数据。
+// 字段通过 change / form-change 事件抛给父组件（父组件负责同步 taskInfo、formData 与画布）。
 const props = defineProps({
-  // 当前选中的 bpmn-js 元素
+  // 当前选中的 bpmn-js 元素；为空表示未选中，展示基础信息
   element: {
     type: Object,
     default: null
@@ -14,10 +14,15 @@ const props = defineProps({
   taskInfo: {
     type: Array,
     default: () => []
+  },
+  // 流程表单元数据（未选中节点时编辑）
+  formData: {
+    type: Object,
+    default: () => ({})
   }
 })
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'form-change'])
 
 // 类型展示名（去掉 bpmn: 前缀）
 const typeName = computed(() => (props.element?.businessObject?.$type || '').replace('bpmn:', ''))
@@ -29,8 +34,20 @@ const entry = computed(() => {
   return props.taskInfo.find((t) => t.id === bo.id && t.$type === bo.$type) || null
 })
 
+// 流程表单元数据字段配置
+const BASIC_FIELDS = [
+  { key: 'workflowCode', label: '流程代码' },
+  { key: 'workflowName', label: '流程名称' },
+  { key: 'workflowType', label: '流程类型' },
+  { key: 'publishedFlag', label: '发布标志' },
+  { key: 'workflowParam', label: '流程参数' },
+  { key: 'modelId', label: '模型ID' },
+  { key: 'version', label: '版本号' },
+  { key: 'newFlag', label: '新建标志' }
+]
+
 // 各元素类型可编辑的字段配置
-const FIELDS = {
+const TASK_FIELDS = {
   'bpmn:StartEvent': [
     { key: 'name', label: '节点名称' },
     { key: 'progressBarName', label: '进度条名称' }
@@ -48,71 +65,87 @@ const FIELDS = {
   ]
 }
 
-const fields = computed(() => FIELDS[entry.value?.$type] || [{ key: 'name', label: '节点名称' }])
+const taskFields = computed(() => TASK_FIELDS[entry.value?.$type] || [{ key: 'name', label: '节点名称' }])
 
 function updateField(key, value) {
   emit('change', { key, value })
 }
+
+function updateFormField(key, value) {
+  emit('form-change', { key, value })
+}
 </script>
 
 <template>
-  <div class="taskinfo-panel">
+  <div class="panel-root">
     <template v-if="entry">
-      <div class="taskinfo-head">
-        <div class="taskinfo-type">{{ typeName }}</div>
-        <div class="taskinfo-id">{{ entry.id }}</div>
+      <div class="panel-head">
+        <div class="panel-type">{{ typeName }}</div>
+        <div class="panel-id">{{ entry.id }}</div>
       </div>
-      <div class="taskinfo-fields">
-        <div v-for="field in fields" :key="field.key" class="taskinfo-field">
-          <label class="taskinfo-label">{{ field.label }}</label>
+      <div class="panel-fields">
+        <div v-for="field in taskFields" :key="field.key" class="panel-field">
+          <label class="panel-label">{{ field.label }}</label>
           <input
-            class="taskinfo-input"
+            class="panel-input"
             :value="entry[field.key] ?? ''"
             @input="updateField(field.key, $event.target.value)"
           />
         </div>
       </div>
     </template>
-    <div v-else class="taskinfo-empty">该元素暂无属性配置</div>
+    <template v-else>
+      <div class="panel-head">基础信息</div>
+      <div class="panel-fields">
+        <div v-for="field in BASIC_FIELDS" :key="field.key" class="panel-field">
+          <label class="panel-label">{{ field.label }}</label>
+          <input
+            class="panel-input"
+            :value="formData[field.key] ?? ''"
+            @input="updateFormField(field.key, $event.target.value)"
+          />
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.taskinfo-panel {
+.panel-root {
   padding: 12px 16px;
 }
 
-.taskinfo-head {
+.panel-head {
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.taskinfo-type {
+.panel-type {
   font-size: 14px;
   font-weight: 600;
   color: #111827;
 }
 
-.taskinfo-id {
+.panel-id {
   margin-top: 2px;
   font-size: 12px;
   color: #9ca3af;
   word-break: break-all;
 }
 
-.taskinfo-fields {
+.panel-fields {
   padding-top: 12px;
 }
 
-.taskinfo-field {
+.panel-field {
   margin-bottom: 12px;
 }
 
-.taskinfo-field:last-child {
+.panel-field:last-child {
   margin-bottom: 0;
 }
 
-.taskinfo-label {
+.panel-label {
   display: block;
   margin-bottom: 6px;
   font-size: 12px;
@@ -120,7 +153,7 @@ function updateField(key, value) {
   color: #374151;
 }
 
-.taskinfo-input {
+.panel-input {
   width: 100%;
   height: 32px;
   padding: 0 10px;
@@ -133,15 +166,8 @@ function updateField(key, value) {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.taskinfo-input:focus {
+.panel-input:focus {
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
-}
-
-.taskinfo-empty {
-  padding: 16px;
-  font-size: 13px;
-  color: #9ca3af;
-  text-align: center;
 }
 </style>
