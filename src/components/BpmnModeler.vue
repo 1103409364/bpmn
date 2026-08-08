@@ -34,6 +34,8 @@ const panelRef = ref(null)
 
 // modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
+// modeler 初始化完成标志（响应式）：用于控制顶部工具栏、属性面板的显示
+const modelerReady = ref(false)
 // 保存后的流程 XML 字符串
 let bpmnXml = ''
 
@@ -123,6 +125,9 @@ async function initModeler() {
   })
   updateCommandState()
 
+  // modeler 初始化完成，通知 Vue 重渲染以显示顶部工具栏
+  modelerReady.value = true
+
   // 为手风琴 palette 挂载收起按钮：点击收起隐藏，点击左上角手柄重新展开
   setupPaletteCollapse()
 }
@@ -206,7 +211,7 @@ function zoomOut() {
 }
 
 function resetZoom() {
-  modeler.get('canvas').zoom('fit-viewport')
+  modeler.get('canvas').zoom('fit-viewport', 'auto')
 }
 
 /**
@@ -276,7 +281,7 @@ defineExpose({ save, download, getXml, undo, redo })
         <span class="bpmn-title">{{ title || '流程设计器' }}</span>
       </div>
       <div class="bpmn-header-right">
-        <template v-if="modeler">
+        <template v-if="modelerReady">
           <button class="bpmn-btn" :disabled="!canUndo" @click="undo" title="撤销">撤销</button>
           <button class="bpmn-btn" :disabled="!canRedo" @click="redo" title="重做">重做</button>
           <span class="bpmn-divider"></span>
@@ -294,7 +299,7 @@ defineExpose({ save, download, getXml, undo, redo })
     </div>
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
-      <div class="bpmn-panel" v-show="modeler && activeElement">
+      <div class="bpmn-panel" v-show="modelerReady && activeElement">
         <template v-if="activeElement">
           <div class="bpmn-panel-head">
             <div class="bpmn-panel-title">{{ elementType.replace('bpmn:', '') }}</div>

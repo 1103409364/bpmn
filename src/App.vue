@@ -36,7 +36,7 @@ function onCommandChanged() {
     <BpmnModeler
       ref="modelerRef"
       :xml="initialXml"
-      title="请假审批流程"
+      title="BPMN 流程设计器"
       @saved="onSaved"
       @command-stack-changed="onCommandChanged"
     />
