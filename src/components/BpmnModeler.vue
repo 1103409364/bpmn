@@ -319,7 +319,9 @@ function zoomOut() {
 }
 
 function resetZoom() {
-  modeler.get('canvas').zoom('fit-viewport', 'auto')
+  const canvas = modeler.get('canvas')
+  canvas.resized();
+  canvas.zoom('fit-viewport', 'auto')
 }
 
 /**
