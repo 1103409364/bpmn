@@ -46,12 +46,45 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
     </div>
     <div class="bpmn-header-right">
       <template v-if="modelerReady">
-        <button class="bpmn-btn" :disabled="!canUndo" @click="emit('undo')" title="撤销">撤销</button>
-        <button class="bpmn-btn" :disabled="!canRedo" @click="emit('redo')" title="重做">重做</button>
+        <button class="bpmn-btn" :disabled="!canUndo" @click="emit('undo')" title="撤销">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 7v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>撤销</span>
+        </button>
+        <button class="bpmn-btn" :disabled="!canRedo" @click="emit('redo')" title="重做">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 7v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>重做</span>
+        </button>
         <span class="bpmn-divider"></span>
-        <button class="bpmn-btn" @click="emit('zoom-out')" title="缩小">-</button>
-        <button class="bpmn-btn" @click="emit('reset-zoom')" title="适应窗口">适应</button>
-        <button class="bpmn-btn" @click="emit('zoom-in')" title="放大">+</button>
+        <button class="bpmn-btn bpmn-btn-icon" @click="emit('zoom-out')" title="缩小">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="m21 21-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 11h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="bpmn-btn" @click="emit('reset-zoom')" title="适应窗口">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M16 21h3a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>适应</span>
+        </button>
+        <button class="bpmn-btn bpmn-btn-icon" @click="emit('zoom-in')" title="放大">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="m21 21-4.3-4.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 11h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M11 8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
         <span class="bpmn-divider"></span>
         <button
           class="bpmn-btn"
@@ -59,13 +92,36 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
           @click="emit('toggle-panels')"
           :title="allPanelsCollapsed ? '退出预览' : '收起面板，预览流程'"
         >
-          预览
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>预览</span>
         </button>
         <span class="bpmn-divider"></span>
-        <button class="bpmn-btn" @click="emit('download', 'svg')">下载SVG</button>
-        <button class="bpmn-btn" @click="emit('download', 'xml')">下载XML</button>
+        <button class="bpmn-btn" @click="emit('download', 'svg')">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>下载SVG</span>
+        </button>
+        <button class="bpmn-btn" @click="emit('download', 'xml')">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>下载XML</span>
+        </button>
         <button class="bpmn-btn bpmn-btn-primary" :disabled="isSaving" @click="emit('save')">
-          {{ isSaving ? '保存中...' : '保存' }}
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M17 21v-8H7v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 3v5h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>{{ isSaving ? '保存中...' : '保存' }}</span>
         </button>
       </template>
     </div>
@@ -118,6 +174,9 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
 }
 
 .bpmn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 30px;
   padding: 0 12px;
   border: 1px solid #d1d5db;
@@ -127,6 +186,16 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.bpmn-btn-icon {
+  padding: 0 8px;
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .bpmn-btn:hover:not(:disabled) {
