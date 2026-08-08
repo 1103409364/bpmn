@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
-import Toast from './components/toast/Toast.vue'
 import { useToast } from './composables/useToast.js'
 // ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理） 把示例流程 XML 以纯文本导入，作为设计器初始内容
 import defaultBpmn from './assets/bpmn/default.bpmn?raw'
@@ -56,7 +55,6 @@ onMounted(() => {
       流程 XML: {{ (formBean.bpmn.length / 1024).toFixed(1) }} KB /
       taskInfo: {{ (formBean.taskInfo.length / 1024).toFixed(1) }} KB
     </div>
-    <Toast />
   </div>
 </template>
 
