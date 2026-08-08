@@ -218,6 +218,9 @@ function collectFlowNodes() {
   const elementRegistry = modeler.get('elementRegistry')
   const nodes = []
   elementRegistry.getAll().forEach((element) => {
+    // 标签元素只是可视化注释，不是流程语义节点；它们会共享目标元素的 businessObject，
+    // 若不跳过，会把连线标签误当成流程节点并生成多余 taskInfo 条目。
+    if (element.labelTarget || element.type === 'label') return
     // 连线（SequenceFlow/Association 等）带 waypoints，直接跳过
     if (element.waypoints) return
     const bo = element.businessObject
