@@ -119,6 +119,60 @@ async function initModeler() {
     emit('command-stack-changed')
   })
   updateCommandState()
+
+  // 为手风琴 palette 挂载收起按钮：点击收起隐藏，点击左上角手柄重新展开
+  setupPaletteCollapse()
+}
+
+/**
+ * 手风琴 palette 收起/展开：
+ * - 展开时顶部工具栏提供"收起"按钮，点击后隐藏 palette
+ * - 隐藏后只留一个左上角的小手柄，点击即可重新展开
+ */
+function setupPaletteCollapse() {
+  const palette = modeler.get('palette')
+  const paletteEl = canvasRef.value.querySelector('.djs-accordion-palette')
+  if (!palette || !paletteEl) return
+
+  // 顶部工具栏：标题 + 收起按钮（仅展开时显示）
+  const toolbar = document.createElement('div')
+  toolbar.className = 'djs-accordion-palette-toolbar'
+  const title = document.createElement('span')
+  title.className = 'djs-accordion-palette-title'
+  title.textContent = '工具栏'
+  const collapseBtn = document.createElement('button')
+  collapseBtn.type = 'button'
+  collapseBtn.className = 'djs-accordion-palette-collapse'
+  collapseBtn.title = '收起工具栏'
+  collapseBtn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">' +
+    '<path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>'
+  collapseBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (palette.isOpen()) {
+      palette.close()
+    }
+  })
+  toolbar.appendChild(title)
+  toolbar.appendChild(collapseBtn)
+  // 插入到条目容器之前，让工具栏显示在 palette 顶部
+  paletteEl.prepend(toolbar)
+
+  // 隐藏后的展开入口：左上角的小手柄（点击重新展开）
+  const handle = document.createElement('div')
+  handle.className = 'djs-accordion-palette-handle'
+  handle.title = '展开工具栏'
+  handle.innerHTML =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">' +
+    '<path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+    '</svg>'
+  handle.addEventListener('click', () => {
+    if (!palette.isOpen()) {
+      palette.open()
+    }
+  })
+  paletteEl.appendChild(handle)
 }
 
 // commandStack service：记录所有编辑操作，提供撤销/重做
@@ -237,7 +291,7 @@ defineExpose({ save, download, getXml, undo, redo })
     </div>
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
-      <div class="bpmn-panel" v-show="modeler">
+      <div class="bpmn-panel" v-show="modeler && activeElement">
         <template v-if="activeElement">
           <div class="bpmn-panel-head">
             <div class="bpmn-panel-title">{{ elementType.replace('bpmn:', '') }}</div>
@@ -245,7 +299,6 @@ defineExpose({ save, download, getXml, undo, redo })
           </div>
           <div class="bpmn-panel-body" ref="panelRef"></div>
         </template>
-        <div v-else class="bpmn-panel-empty">选择一个元素查看属性</div>
       </div>
     </div>
   </div>
@@ -399,6 +452,76 @@ defineExpose({ save, download, getXml, undo, redo })
 /* .bjs-powered-by {
   display: none;
 } */
+
+/* ---------- 手风琴 palette 收起/展开 ---------- */
+/* 基础定位：展开/折叠时都固定在画布左上角 */
+.djs-accordion-palette {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  z-index: 100;
+}
+
+/* 展开时的顶部工具栏：标题 + 收起按钮 */
+.djs-accordion-palette-toolbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  margin-bottom: 2px;
+}
+
+.djs-accordion-palette.open .djs-accordion-palette-toolbar {
+  display: flex;
+}
+
+.djs-accordion-palette-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.djs-accordion-palette-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.djs-accordion-palette-collapse:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
+/* 收起后收缩成一个小手柄，点击重新展开 */
+.djs-accordion-palette.djs-palette:not(.open) {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 4px;
+  box-shadow: 0 0 10px var(--color-black-opacity-10);
+  background-color: var(--color-white);
+}
+
+.djs-accordion-palette-handle {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+}
+
+.djs-accordion-palette.djs-palette:not(.open) .djs-accordion-palette-handle {
+  display: flex;
+}
 
 .bpmn-panel-body .bio-properties-panel {
   --color-000000: #111827;
