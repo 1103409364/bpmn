@@ -22,7 +22,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['change', 'form-change'])
+const emit = defineEmits(['change', 'form-change', 'close'])
 
 // 类型展示名（去掉 bpmn: 前缀）
 const typeName = computed(() => (props.element?.businessObject?.$type || '').replace('bpmn:', ''))
@@ -78,12 +78,22 @@ function updateFormField(key, value) {
 
 <template>
   <div class="panel-root">
-    <template v-if="entry">
-      <div class="panel-head">
-        <div class="panel-type">{{ typeName }}</div>
-        <div class="panel-id">{{ entry.id }}</div>
+    <div class="panel-head">
+      <div class="panel-head-main">
+        <template v-if="entry">
+          <div class="panel-type">{{ typeName }}</div>
+          <div class="panel-id">{{ entry.id }}</div>
+        </template>
+        <div v-else class="panel-type">基础信息</div>
       </div>
-      <div class="panel-fields">
+      <button class="panel-toggle" title="收起" @click="emit('close')">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="panel-fields">
+      <template v-if="entry">
         <div v-for="field in taskFields" :key="field.key" class="panel-field">
           <label class="panel-label">{{ field.label }}</label>
           <input
@@ -92,11 +102,8 @@ function updateFormField(key, value) {
             @input="updateField(field.key, $event.target.value)"
           />
         </div>
-      </div>
-    </template>
-    <template v-else>
-      <div class="panel-head">基础信息</div>
-      <div class="panel-fields">
+      </template>
+      <template v-else>
         <div v-for="field in BASIC_FIELDS" :key="field.key" class="panel-field">
           <label class="panel-label">{{ field.label }}</label>
           <input
@@ -105,8 +112,8 @@ function updateFormField(key, value) {
             @input="updateFormField(field.key, $event.target.value)"
           />
         </div>
-      </div>
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -116,8 +123,37 @@ function updateFormField(key, value) {
 }
 
 .panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.panel-head-main {
+  min-width: 0;
+}
+
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.panel-toggle:hover {
+  color: #111827;
+  background: #f3f4f6;
 }
 
 .panel-type {
