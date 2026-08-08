@@ -134,17 +134,24 @@ function updateFormField(key, value) {
 </template>
 
 <style scoped>
+/* 悬浮在画布右上方的浮层面板（不再占用侧边栏空间） */
 .bpmn-panel {
-  position: relative;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: 260px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
-  flex-shrink: 0;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
+  z-index: 50;
 }
 
 .bpmn-panel.collapsed {
   width: 0;
   border-left: none;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .panel-scroll {
