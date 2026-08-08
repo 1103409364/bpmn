@@ -25,11 +25,6 @@ const { showToast } = useToast()
 function onSaved() {
   showToast('流程保存成功')
 }
-
-// 监听 command-stack-changed：画布内容有改动时提醒用户保存
-function onCommandChanged() {
-  showToast('已变更，请记得保存')
-}
 </script>
 
 <template>
@@ -40,7 +35,6 @@ function onCommandChanged() {
       :title="formBean.workflowName"
       v-model:form-data="formBean"
       @saved="onSaved"
-      @command-stack-changed="onCommandChanged"
     />
     <div v-if="formBean.bpmn" class="flow-info">
       流程 XML: {{ (formBean.bpmn.length / 1024).toFixed(1) }} KB /
