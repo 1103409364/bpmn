@@ -7,8 +7,6 @@ import BpmnModeler from 'bpmn-js/lib/Modeler'
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
-// ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理）
-import initialXml from '../assets/bpmn/initial.bpmn?raw'
 // 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
 import 'diagram-js-accordion-palette/assets/index.css'
 // 属性编辑器组件：选中元素时编辑节点属性，未选中时编辑流程表单元数据
@@ -68,8 +66,6 @@ watch(
 let modeler = null
 // modeler 初始化完成标志（响应式）：用于控制顶部工具栏、属性面板的显示
 const modelerReady = ref(false)
-// 保存后的流程 XML 字符串
-let bpmnXml = ''
 // bpmn-auto-layout 的 layoutProcess：懒加载，首次自动布局时动态 import
 let layoutProcess = null
 
@@ -457,9 +453,7 @@ function resetZoom() {
 
 /**
  * 组装最终落库的 formBean：
- * - bpmn：序列化后的流程 XML
  * - taskInfo：节点属性 JSON 字符串（唯一数据源）
- * - 其余为流程表单元数据，父组件可通过 formData prop 或 save/getFormBean 的 extra 参数覆盖
  * - processBarInfo 为进度条信息，默认空数组，由业务侧填充
  */
 function buildFormBean(extra = {}) {
@@ -468,17 +462,13 @@ function buildFormBean(extra = {}) {
     workflowName: '',
     workflowType: 'W',
     publishedFlag: '1',
-    bpmn: bpmnXml,
     workflowParam: '',
     modelId: '',
     version: '',
     newFlag: '',
-    taskInfo: JSON.stringify(taskInfo.value),
     processBarInfo: [],
     ...formDataLocal.value,
     ...extra,
-    // bpmn / taskInfo 始终取当前实时状态
-    bpmn: bpmnXml,
     taskInfo: JSON.stringify(taskInfo.value)
   }
 }
@@ -493,7 +483,7 @@ async function save(extra = {}) {
   isSaving.value = true
   try {
     const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
-    bpmnXml = xml
+    formDataLocal.value.bpmn = xml
     const bean = buildFormBean(extra)
     // 把保存结果合并进本地状态并记录快照，保证保存后 isDirty 立即为 false
     formDataLocal.value = { ...formDataLocal.value, ...bean }
@@ -507,16 +497,7 @@ async function save(extra = {}) {
   }
 }
 
-/**
- * 不触发保存，直接返回当前状态的 formBean（bpmn 为最近一次序列化结果，未保存过则为空）
- */
-function getFormBean(extra = {}) {
-  return buildFormBean(extra)
-}
 
-function getXml() {
-  return bpmnXml
-}
 
 // 下载导出：type 为 'xml' 或 'svg'
 async function download(type) {
@@ -554,7 +535,7 @@ onBeforeUnmount(() => {
 })
 
 // 暴露给父组件调用的方法
-defineExpose({ save, download, getXml, getFormBean, undo, redo, autoLayout, taskInfo })
+defineExpose({ save, download, undo, redo, autoLayout, taskInfo })
 </script>
 
 <template>

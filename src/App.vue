@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
 import Toast from './components/Toast.vue'
 import { useToast } from './composables/useToast.js'
-// ?raw 把示例流程 XML 以纯文本导入，作为设计器初始内容
+// ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理） 把示例流程 XML 以纯文本导入，作为设计器初始内容
 import initialXml from './assets/bpmn/initial.bpmn?raw'
 
 // 子组件实例引用：可通过 modelerRef.value.save() 等方式调用组件暴露的方法
