@@ -499,22 +499,22 @@ function resetZoom() {
  * - taskInfo：节点属性 JSON 字符串（唯一数据源）
  * - processBarInfo 为进度条信息，默认空数组，由业务侧填充
  */
-function buildFormBean(extra = {}) {
-  return {
-    workflowCode: '',
-    workflowName: '',
-    workflowType: 'W',
-    publishedFlag: '1',
-    workflowParam: '',
-    modelId: '',
-    version: '',
-    newFlag: '',
-    processBarInfo: [],
-    ...formDataLocal.value,
-    ...extra,
-    taskInfo: JSON.stringify(taskInfo.value)
-  }
-}
+// function buildFormBean(extra = {}) {
+//   return {
+//     workflowCode: '',
+//     workflowName: '',
+//     workflowType: 'W',
+//     publishedFlag: '1',
+//     workflowParam: '',
+//     modelId: '',
+//     version: '',
+//     newFlag: '',
+//     processBarInfo: [],
+//     ...formDataLocal.value,
+//     taskInfo: JSON.stringify(taskInfo.value),
+//     ...extra // extra 覆盖前面字段
+//   }
+// }
 
 /**
  * 保存流程：把画布上的所有改动序列化回 BPMN XML，组装 formBean 并通过 v-model:form-data
@@ -525,13 +525,14 @@ async function save(extra = {}) {
   if (!modeler) return
   isSaving.value = true
   try {
-    const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
-    formDataLocal.value.bpmn = xml
-    const bean = buildFormBean(extra)
+    // v-model:form-data 已经实时同步了 bpmn/taskInfo，保存时无需再调用 saveXML 重新序列化
+    // const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
+    // formDataLocal.value.bpmn = xml
+    // const bean = buildFormBean(extra)
+    // formDataLocal.value = { ...formDataLocal.value, ...bean }
     // 把保存结果合并进本地状态并记录快照，保证保存后 isDirty 立即为 false
-    formDataLocal.value = { ...formDataLocal.value, ...bean }
     savedSnapshot.value = { ...formDataLocal.value }
-    emit('update:formData', bean)
+    // emit('update:formData', bean)
     emit('saved')
   } catch (err) {
     console.error('保存失败:', err)
