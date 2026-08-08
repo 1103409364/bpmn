@@ -71,6 +71,8 @@ const canRedo = ref(false)
 const isSaving = ref(false)
 // 右侧属性面板显示/隐藏状态
 const panelVisible = ref(true)
+// 所有面板是否都已收起（用于切换按钮文案）
+const allPanelsCollapsed = ref(false)
 
 /**
  * 初始化 bpmn-js Modeler。
@@ -311,6 +313,23 @@ function redo() {
   modeler.get('commandStack').redo()
 }
 
+// 一键收起/展开所有面板（左侧工具栏 + 右侧属性面板）
+function toggleAllPanels() {
+  const palette = modeler.get('palette')
+  const paletteOpen = palette && palette.isOpen()
+  if (paletteOpen || panelVisible.value) {
+    // 收起所有面板
+    if (paletteOpen) palette.close()
+    panelVisible.value = false
+    allPanelsCollapsed.value = true
+  } else {
+    // 展开所有面板
+    palette.open()
+    panelVisible.value = true
+    allPanelsCollapsed.value = false
+  }
+}
+
 function zoomIn() {
   const canvas = modeler.get('canvas')
   // canvas.zoom(newScale) 第一个参数是缩放系数，不传第二个参数时自动以视口中心为锚点缩放
@@ -441,6 +460,15 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
           <button class="bpmn-btn" @click="resetZoom" title="适应窗口">适应</button>
           <button class="bpmn-btn" @click="zoomIn" title="放大">+</button>
           <span class="bpmn-divider"></span>
+          <button
+            class="bpmn-btn"
+            :class="{ 'bpmn-btn-active': allPanelsCollapsed }"
+            @click="toggleAllPanels"
+            :title="allPanelsCollapsed ? '退出预览' : '收起面板，预览流程'"
+          >
+            预览
+          </button>
+          <span class="bpmn-divider"></span>
           <button class="bpmn-btn" @click="download('svg')">下载SVG</button>
           <button class="bpmn-btn" @click="download('xml')">下载XML</button>
           <button class="bpmn-btn bpmn-btn-primary" :disabled="isSaving" @click="save">
@@ -547,6 +575,18 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 
 .bpmn-btn-primary:hover:not(:disabled) {
   background: #059669;
+  color: #fff;
+}
+
+.bpmn-btn-active {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.bpmn-btn-active:hover:not(:disabled) {
+  background: #059669;
+  border-color: #059669;
   color: #fff;
 }
 
