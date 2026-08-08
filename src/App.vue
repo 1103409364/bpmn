@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
+import Toast from './components/Toast.vue'
+import { useToast } from './composables/useToast.js'
 // ?raw 把示例流程 XML 以纯文本导入，作为设计器初始内容
 import initialXml from './assets/bpmn/initial.bpmn?raw'
 
@@ -16,16 +18,8 @@ const formBean = ref({
   bpmn: initialXml,
   taskInfo: '[]'
 })
-// 页面右上角的轻提示文案，空字符串表示不显示
-const toast = ref('')
-
-let toastTimer = null
-
-function showToast(msg) {
-  toast.value = msg
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => (toast.value = ''), 2500)
-}
+// 页面右上角的轻提示（渲染在 <Toast /> 中，这里只取触发函数）
+const { showToast } = useToast()
 
 // 监听子组件 saved 事件：保存完成通知（数据已由 v-model:form-data 自动同步）
 function onSaved() {
@@ -52,9 +46,7 @@ function onCommandChanged() {
       流程 XML: {{ (formBean.bpmn.length / 1024).toFixed(1) }} KB /
       taskInfo: {{ (formBean.taskInfo.length / 1024).toFixed(1) }} KB
     </div>
-    <transition name="fade">
-      <div v-if="toast" class="flow-toast">{{ toast }}</div>
-    </transition>
+    <Toast />
   </div>
 </template>
 
@@ -89,29 +81,6 @@ body,
   font-size: 12px;
 }
 
-.flow-toast {
-  position: fixed;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 200;
-  padding: 8px 16px;
-  background: #10b981;
-  color: #fff;
-  border-radius: 6px;
-  font-size: 13px;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
 .custom-icon-test {
   background-image: url('./assets/vite.svg');
   background-size: 100% 100%;
