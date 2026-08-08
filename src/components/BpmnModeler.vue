@@ -358,6 +358,10 @@ async function autoLayout() {
     await modeler.importXML(laidOutXml)
     // 重新导入会重建元素实例，taskInfo 需按 id 重新对齐（自定义属性保留）
     syncTaskInfo()
+    // 重新导入时命令栈通过 clear(false) 清空，不会触发 commandStack.changed，
+    // 这里手动刷新撤销/重做按钮状态并标记画布存在未保存的修改
+    updateCommandState()
+    canvasDirty.value = true
     const canvas = modeler.get('canvas')
     canvas.resized()
     canvas.zoom('fit-viewport', 'auto')
