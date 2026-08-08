@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 // bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。
 // 内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
 import BpmnModeler from 'bpmn-js/lib/Modeler'
@@ -44,6 +44,16 @@ const canvasRef = ref(null)
 
 // 本地 formData 副本：右侧基础信息编辑器直接修改它，改动后同步回父组件
 const formDataLocal = ref({ ...props.formData })
+
+// v-model 透传桥：setter 里既更新本地副本又 emit 给父组件（App），
+// 使 PropertyPanel 的 v-model:form-data 改动一路同步到最外层
+const formDataModel = computed({
+  get: () => formDataLocal.value,
+  set: (val) => {
+    formDataLocal.value = val
+    emit('update:formData', val)
+  }
+})
 
 // 父组件传入的 formData 变化时同步进本地副本（如从数据库回显）
 watch(
@@ -238,14 +248,6 @@ function onTaskInfoChange({ key, value }) {
     // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈
     modeler.get('modeling').updateProperties(element, { name: value })
   }
-}
-
-/**
- * 基础信息编辑器 change 事件处理：更新本地 formData 并同步回父组件（v-model:form-data）
- */
-function onFormDataChange({ key, value }) {
-  formDataLocal.value = { ...formDataLocal.value, [key]: value }
-  emit('update:formData', { ...formDataLocal.value })
 }
 
 /**
@@ -468,10 +470,9 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
         v-if="modelerReady"
         :element="activeElement"
         :task-info="taskInfo"
-        :form-data="formDataLocal"
+        v-model:form-data="formDataModel"
         :collapsed="!panelVisible"
         @change="onTaskInfoChange"
-        @form-change="onFormDataChange"
         @close="panelVisible = false"
         @expand="panelVisible = true"
       />
