@@ -529,7 +529,7 @@ function downloadBlob(blob, filename) {
 // onMounted 后再初始化：确保 canvasRef 对应的 DOM 已经渲染到页面中
 onMounted(async () => {
   await nextTick()
-  initModeler()
+  await initModeler()
 })
 
 // 组件销毁时释放 modeler 实例，避免内存泄漏和事件残留
