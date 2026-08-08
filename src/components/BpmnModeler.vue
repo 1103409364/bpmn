@@ -529,6 +529,7 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 }
 .djs-accordion-palette.open {
   width: 160px;
+  border-radius: 6px;
 }
 .djs-accordion-palette.open .djs-accordion-palette-toolbar {
   display: flex;
@@ -579,7 +580,7 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   height: 40px;
   padding: 0;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   background-color: #fff;
 }
