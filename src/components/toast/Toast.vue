@@ -1,7 +1,7 @@
 <script setup>
 // 轻提示展示组件：HTML + CSS 与状态（useToast 单例）在此封装，
 // 业务侧只需调用 useToast().showToast() 触发，无需感知渲染细节
-import { useToast } from '../composables/useToast.js'
+import { useToast } from '../../composables/useToast.js'
 
 const { toast } = useToast()
 </script>

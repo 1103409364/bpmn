@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
-import Toast from './components/Toast.vue'
+import Toast from './components/toast/Toast.vue'
 import { useToast } from './composables/useToast.js'
 // ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理） 把示例流程 XML 以纯文本导入，作为设计器初始内容
 import initialXml from './assets/bpmn/initial.bpmn?raw'
