@@ -265,7 +265,7 @@ function setupPaletteCollapse() {
   collapseBtn.className = 'djs-accordion-palette-collapse'
   collapseBtn.title = '收起工具栏'
   collapseBtn.innerHTML =
-    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
     '<path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg>'
   collapseBtn.addEventListener('click', (e) => {
@@ -588,8 +588,10 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   display: none;
   align-items: center;
   justify-content: space-between;
-  height: 28px;
-  margin-bottom: 2px;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
 }
 .djs-accordion-palette.open {
   width: 160px;
@@ -618,18 +620,23 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: #6b7280;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   line-height: 1;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
 }
 
 .djs-accordion-palette-collapse:hover {
-  color: #111827;
-  background: #f3f4f6;
+  border-color: #10b981;
+  color: #10b981;
+  background: #f0fdf4;
 }
 
 /* 收起后收缩成一个小手柄，点击重新展开 */
@@ -637,9 +644,10 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   width: 40px;
   height: 40px;
   padding: 0;
-  border-radius: 4px;
-  box-shadow: 0 0 10px var(--color-black-opacity-10);
-  background-color: var(--color-white);
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
 }
 
 .djs-accordion-palette-handle {
@@ -650,10 +658,14 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   justify-content: center;
   cursor: pointer;
   color: #374151;
+  transition: color 0.15s;
 }
 
 .djs-accordion-palette.djs-palette:not(.open) .djs-accordion-palette-handle {
   display: flex;
 }
 
+.djs-accordion-palette-handle:hover {
+  color: #10b981;
+}
 </style>
