@@ -83,72 +83,77 @@ function updateFormField(key, value) {
 
 <template>
   <div class="bpmn-panel" :class="{ collapsed }">
-    <div class="panel-root">
-      <button v-if="collapsed" class="panel-expand" title="展开属性" @click="emit('expand')">
+    <button v-if="collapsed" class="panel-expand" title="展开属性" @click="emit('expand')">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <template v-else>
+      <button class="panel-toggle" title="收起" @click="emit('close')">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-      <template v-else>
-        <button class="panel-toggle" title="收起" @click="emit('close')">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <div class="panel-head">
-          <div class="panel-head-main">
+      <div class="panel-scroll">
+        <div class="panel-root">
+          <div class="panel-head">
+            <div class="panel-head-main">
+              <template v-if="entry">
+                <div class="panel-type">{{ typeName }}</div>
+                <div class="panel-id">{{ entry.id }}</div>
+              </template>
+              <div v-else class="panel-type">基础信息</div>
+            </div>
+          </div>
+          <div class="panel-fields">
             <template v-if="entry">
-              <div class="panel-type">{{ typeName }}</div>
-              <div class="panel-id">{{ entry.id }}</div>
+              <div v-for="field in taskFields" :key="field.key" class="panel-field">
+                <label class="panel-label">{{ field.label }}</label>
+                <input
+                  class="panel-input"
+                  :value="entry[field.key] ?? ''"
+                  @input="updateField(field.key, $event.target.value)"
+                />
+              </div>
             </template>
-            <div v-else class="panel-type">基础信息</div>
+            <template v-else>
+              <div v-for="field in BASIC_FIELDS" :key="field.key" class="panel-field">
+                <label class="panel-label">{{ field.label }}</label>
+                <input
+                  class="panel-input"
+                  :value="formData[field.key] ?? ''"
+                  @input="updateFormField(field.key, $event.target.value)"
+                />
+              </div>
+            </template>
           </div>
         </div>
-        <div class="panel-fields">
-          <template v-if="entry">
-            <div v-for="field in taskFields" :key="field.key" class="panel-field">
-              <label class="panel-label">{{ field.label }}</label>
-              <input
-                class="panel-input"
-                :value="entry[field.key] ?? ''"
-                @input="updateField(field.key, $event.target.value)"
-              />
-            </div>
-          </template>
-          <template v-else>
-            <div v-for="field in BASIC_FIELDS" :key="field.key" class="panel-field">
-              <label class="panel-label">{{ field.label }}</label>
-              <input
-                class="panel-input"
-                :value="formData[field.key] ?? ''"
-                @input="updateFormField(field.key, $event.target.value)"
-              />
-            </div>
-          </template>
-        </div>
-      </template>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .bpmn-panel {
   position: relative;
-  width: 320px;
+  width: 260px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
-  overflow-y: auto;
   flex-shrink: 0;
 }
 
 .bpmn-panel.collapsed {
   width: 0;
   border-left: none;
-  overflow: visible;
+}
+
+.panel-scroll {
+  height: 100%;
+  overflow-y: auto;
 }
 
 .panel-root {
-  padding: 12px 16px 12px 40px;
+  padding: 12px 16px;
 }
 
 .panel-head {
@@ -184,7 +189,7 @@ function updateFormField(key, value) {
 }
 
 .panel-toggle {
-  left: 8px;
+  left: -12px;
 }
 
 .panel-expand {
