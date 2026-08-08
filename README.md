@@ -61,6 +61,7 @@ bpmn/
 | 撤销 / 重做 | 通过 `commandStack` 实现，状态实时刷新 |
 | 缩放 & 视图 | 放大、缩小、适应窗口、手风琴式工具栏 |
 | 保存 & 导出 | 导出格式化 XML 或 SVG，通过 `saved` 事件回传完整 formBean |
+| 未保存提醒 | 工具栏保存按钮显示脏标记圆点，提示存在未保存的修改（详见"未保存修改检测"一节） |
 | 选中联动 | 显示当前选中元素的 id、类型、属性 |
 | 网格显示 | 画布上的点状网格，便于元素对齐 |
 
@@ -106,7 +107,7 @@ bpmn/
 
 - 通过 `v-model:form-data` 双向绑定流程表单元数据
 - 监听 `saved` 事件获取完整的 formBean（bpmn XML + taskInfo + 表单数据）
-- 监听 `command-stack-changed` 提醒用户保存变更
+- 未保存修改的提醒由设计器工具栏的"脏标记圆点"承担（见"未保存修改检测"一节）
 - 显示保存成功提示与流程大小信息（KB 单位）
 - 提供全局样式和过渡动画
 
@@ -185,6 +186,47 @@ bpmn/
 - 删除画布中已不存在的元素条目
 - 为 palette 新增的元素追加默认条目
 - 已有条目（按 `id + $type` 匹配）保留其自定义属性值，不会丢失
+
+## 未保存修改检测（脏检查）
+
+设计器的保存按钮带有一个"脏标记"圆点（类似 VS Code 中文件变更后的 tab 圆点），提示当前存在未保存的修改。
+
+当画布或表单发生编辑且尚未保存时，圆点出现；点击保存后圆点消失；撤销回上次保存的状态后圆点同样消失。
+
+### 检测原理
+
+脏标记不再用"是否发生过编辑"的布尔标记（那会让撤销回原状后圆点依然残留），而是**实时对比当前状态与最近一次保存的快照**：
+
+```txt
+实时状态 formDataLocal ──对比──> savedSnapshot（初始 / 最近保存时的快照）
+      │                              │
+      └─ 任一 key 不同 ──────────────┘
+                    │
+                    ▼
+              isDirty = true（显示圆点）
+```
+
+### 核心机制
+
+1. **实时序列化**：`refreshCanvasState()` 在每次 `commandStack.changed`（编辑、撤销、重做）后，把当前画布序列化为 XML 并同步 `taskInfo`，写回 `formDataLocal` 的 `bpmn` / `taskInfo` 字段，使 `formDataLocal` 始终代表画布的最新真实状态。
+
+2. **对象级快照对比**：`savedSnapshot` 以对象形态保存最近一次保存时的完整状态；`sameState()` 逐 key 比较（键序无关，`bpmn` 为字符串、`processBarInfo` 等对象退化为深比较），与字符串拼接比较相比更高效。
+
+3. **XML 归一化**：`normalizeBpmn()` 在比较 `bpmn` 前剔除撤销/重做后 bpmn-js 残留在 DI 中的空 `<bpmndi:BPMNLabel />`。这类空标签无 bounds、无语义，撤销改名后模型状态已还原、但序列化 XML 会多出这一元素，不归一化会导致误判为"有修改"。
+
+4. **初始快照取自实时状态**：组件初始化时先 `await refreshCanvasState()` 再用其结果建立快照，而不是直接用父组件传入的 `props.formData`。否则快照里仍是旧 XML / 空 taskInfo，与实时状态不一致，会误判初始即"脏"或撤销回原状后仍显示脏。
+
+5. **自定义属性也参与脏检测**：修改属性面板的自定义属性（`progressBarName` 等）不触发 `commandStack.changed`，`onTaskInfoChange` 会手动把最新 `taskInfo` 同步进 `formDataLocal`，保证这类改动同样点亮圆点。
+
+6. **保存清除脏标记**：`save()` 成功后把 `buildFormBean(extra)` 的结果合并进 `formDataLocal` 并重建快照，`isDirty` 立即为 `false`。
+
+7. **下载不附带保存副作用**：`download('xml')` 直接对当前画布 `saveXML` 导出，不经过 `save()`，因此下载不会清除脏标记、也不会把未保存的修改"洗白"。
+
+### 代码位置
+
+- 脏检测与快照：`BpmnModeler.vue` 顶部 `savedSnapshot` / `sameState` / `normalizeBpmn` / `isDirty`
+- 实时状态刷新：`BpmnModeler.vue` 中 `refreshCanvasState()`（`commandStack.changed`、初始化、`autoLayout()` 后调用）
+- 圆点展示：`ModelerToolbar.vue` 的 `:is-dirty` prop 与 `.bpmn-btn-dirty-dot` 样式
 
 ## 示例流程
 

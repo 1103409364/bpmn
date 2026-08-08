@@ -84,25 +84,40 @@ const taskInfo = ref([])
 const canUndo = ref(false)
 const canRedo = ref(false)
 const isSaving = ref(false)
-// 画布是否有编辑操作（commandStack.changed 置 true，保存成功后置 false）
-const canvasDirty = ref(false)
-// formBean 快照：初始为挂载时的数据，保存成功时更新为完整 formBean，用于脏检测
-const savedSnapshot = ref(normalizeFormData({ ...props.formData }))
+// 保存成功时的完整状态快照（对象形态，与 formDataLocal 同构），用于脏检测
+const savedSnapshot = ref({ ...props.formData })
 
-// 字段规范化：按 key 排序拼接，避免对象键序差异造成误判
-function normalizeFormData(obj) {
-  return Object.keys(obj)
-    .sort()
-    .map((k) => `${k}:${obj[k]}`)
-    .join('|')
+// bpmn 比较前做归一化：撤销/重做后 bpmn-js 可能在 DI 中残留空的 <bpmndi:BPMNLabel />，
+// 这是无 bounds、无语义的空标签，与初始状态仅差这一个元素，归一化后视为一致
+function normalizeBpmn(xml) {
+  return xml
+    .replace(/[ \t]*<bpmndi:BPMNLabel[ \t]*\/>[ \t]*\r?\n?/g, '')
+    .replace(/[ \t]*<bpmndi:BPMNLabel[ \t]*>[ \t]*<\/bpmndi:BPMNLabel>[ \t]*\r?\n?/g, '')
 }
 
-// 是否存在未保存的修改：画布编辑过，或 formBean 任一字段与最近一次保存不一致，
+// 逐 key 比较两个状态对象（键序无关）：先比 key 集合，再比值，遇到首个差异即返回。
+// 相比把整个对象（含整段 BPMN XML）拼成字符串全量对比，更高效
+function sameState(a, b) {
+  const ka = Object.keys(a).sort()
+  const kb = Object.keys(b).sort()
+  if (ka.length !== kb.length) return false
+  for (let i = 0; i < ka.length; i++) {
+    if (ka[i] !== kb[i]) return false
+    const va = a[ka[i]]
+    const vb = b[ka[i]]
+    if (va === vb) continue
+    // 引用不同但内容相同的对象/数组（如 processBarInfo），退化为深比较
+    if (va && vb && typeof va === 'object' && typeof vb === 'object' && JSON.stringify(va) === JSON.stringify(vb)) continue
+    // bpmn XML 用归一化后比较，容忍撤销/重做残留的空 BPMNLabel
+    if (ka[i] === 'bpmn' && typeof va === 'string' && typeof vb === 'string' && normalizeBpmn(va) === normalizeBpmn(vb)) continue
+    return false
+  }
+  return true
+}
+
+// 是否存在未保存的修改：formDataLocal（含实时 bpmn/taskInfo）与最近一次保存的快照不一致，
 // 驱动工具栏保存按钮的提醒标记（类似 VS Code 文件变更后的 tab 圆点）
-const isDirty = computed(() => {
-  if (canvasDirty.value) return true
-  return normalizeFormData(formDataLocal.value) !== savedSnapshot.value
-})
+const isDirty = computed(() => !sameState(formDataLocal.value, savedSnapshot.value))
 // 右侧属性面板显示/隐藏状态
 const panelVisible = ref(true)
 // 所有面板是否都已收起（用于切换按钮文案）
@@ -151,6 +166,10 @@ async function initModeler() {
 
   // 根据画布元素初始化 taskInfo（自定义属性默认置空，name 取自 businessObject）
   syncTaskInfo()
+  // 把实际加载的画布状态序列化进 formDataLocal，并以此为初始快照：
+  // 避免快照仍是父组件传入的旧 bpmn/空 taskInfo，导致初始即"脏"或撤销回原状仍显示脏
+  await refreshCanvasState()
+  savedSnapshot.value = { ...formDataLocal.value }
 
   // canvas service：负责图形的缩放、平移、视图定位
   const canvas = modeler.get('canvas')
@@ -169,13 +188,10 @@ async function initModeler() {
     }
   })
 
-  // commandStack.changed：任何编辑操作（增删改）发生后触发，借此刷新撤销/重做按钮
+  // commandStack.changed：任何编辑操作（增删改、撤销/重做）发生后触发，
+  // 借此同步 taskInfo、刷新撤销/重做按钮，并把最新画布序列化进 formDataLocal（驱动脏检测）
   eventBus.on('commandStack.changed', () => {
-    // 画布上新增/删除了节点时，同步 taskInfo（已有条目的自定义属性保留）
-    syncTaskInfo()
-    updateCommandState()
-    // 标记画布存在编辑，工具栏保存按钮显示提醒标记（不再弹频繁的 toast）
-    canvasDirty.value = true
+    refreshCanvasState()
   })
   updateCommandState()
 
@@ -267,6 +283,28 @@ function syncTaskInfo() {
 }
 
 /**
+ * 画布发生编辑（或重新导入）后刷新实时状态：
+ * - 同步 taskInfo 与撤销/重做按钮
+ * - 把最新 bpmn / taskInfo 序列化进 formDataLocal，使 isDirty 直接对比"实时状态 vs 保存快照"，
+ *   撤销回原状时脏标记也能正确清除
+ */
+let canvasEditSeq = 0
+async function refreshCanvasState() {
+  if (!modeler) return
+  const seq = ++canvasEditSeq
+  syncTaskInfo()
+  updateCommandState()
+  const { xml } = await modeler.saveXML({ format: true })
+  // 丢弃并发编辑时较早的序列化结果，避免旧 XML 覆盖新状态
+  if (seq !== canvasEditSeq) return
+  formDataLocal.value = {
+    ...formDataLocal.value,
+    bpmn: xml,
+    taskInfo: JSON.stringify(taskInfo.value)
+  }
+}
+
+/**
  * 属性面板 change 事件处理：更新 taskInfo。
  * name 是标准 BPMN 属性，同步回 businessObject 更新节点标签并随 XML 保存；
  * 其余自定义属性仅存于内存 taskInfo，不写入 XML
@@ -279,8 +317,11 @@ function onTaskInfoChange({ key, value }) {
   if (!entry) return
   entry[key] = value
   if (key === 'name') {
-    // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈
+    // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈（其后 commandStack.changed 会刷新实时状态）
     modeler.get('modeling').updateProperties(element, { name: value })
+  } else {
+    // 自定义属性不触发 commandStack.changed，手动把最新 taskInfo 同步进 formDataLocal 供脏检测
+    formDataLocal.value = { ...formDataLocal.value, taskInfo: JSON.stringify(taskInfo.value) }
   }
 }
 
@@ -368,12 +409,9 @@ async function autoLayout() {
     const { xml } = await modeler.saveXML({ format: true })
     const laidOutXml = await layoutProcess(xml)
     await modeler.importXML(laidOutXml)
-    // 重新导入会重建元素实例，taskInfo 需按 id 重新对齐（自定义属性保留）
-    syncTaskInfo()
-    // 重新导入时命令栈通过 clear(false) 清空，不会触发 commandStack.changed，
-    // 这里手动刷新撤销/重做按钮状态并标记画布存在未保存的修改
-    updateCommandState()
-    canvasDirty.value = true
+    // 重新导入会重建元素实例，且命令栈被 clear(false) 清空、不会触发 commandStack.changed，
+    // 这里手动刷新实时状态（taskInfo 对齐、撤销/重做按钮、formDataLocal 的 bpmn/taskInfo）
+    await refreshCanvasState()
     const canvas = modeler.get('canvas')
     canvas.resized()
     canvas.zoom('fit-viewport', 'auto')
@@ -456,10 +494,10 @@ async function save(extra = {}) {
   try {
     const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
     bpmnXml = xml
-    // 保存成功：清除画布编辑标记，并记录当前完整 formBean 快照用于后续脏检测
-    canvasDirty.value = false
     const bean = buildFormBean(extra)
-    savedSnapshot.value = normalizeFormData(bean)
+    // 把保存结果合并进本地状态并记录快照，保证保存后 isDirty 立即为 false
+    formDataLocal.value = { ...formDataLocal.value, ...bean }
+    savedSnapshot.value = { ...formDataLocal.value }
     emit('update:formData', bean)
     emit('saved')
   } catch (err) {
@@ -483,8 +521,10 @@ function getXml() {
 // 下载导出：type 为 'xml' 或 'svg'
 async function download(type) {
   if (type === 'xml') {
-    if (!bpmnXml) await save() // 还没保存过就先保存一次
-    downloadBlob(new Blob([bpmnXml], { type: 'application/xml' }), 'diagram.bpmn')
+    // 直接序列化当前画布状态导出，不经过 save()：
+    // 避免下载附带"清脏/更新快照"副作用，也保证下载的是最新（含未保存修改）的 XML
+    const { xml } = await modeler.saveXML({ format: true })
+    downloadBlob(new Blob([xml], { type: 'application/xml' }), 'diagram.bpmn')
   } else {
     // saveSVG: 导出画布当前视图为 SVG 矢量图
     const { svg } = await modeler.saveSVG()
