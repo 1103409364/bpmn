@@ -239,7 +239,9 @@ function defaultTaskInfoEntry(bo) {
  * 把画布元素与 taskInfo 对齐：
  * - 画布中已删除的元素，从 taskInfo 中移除
  * - 画布中新增的元素（如从 palette 拖入），追加默认条目
- * - 已存在的条目保留其自定义属性值
+ * - 已存在的条目保留其自定义属性值，并同步画布标准属性（name），
+ *   使画布上双击改名等操作能实时反映到属性面板
+ * - 元素类型被替换（id 相同 $type 变化，如 UserTask → ServiceTask）时重建条目，避免残留重复 id 的旧条目
  */
 function syncTaskInfo() {
   if (!modeler) return
@@ -247,10 +249,19 @@ function syncTaskInfo() {
   const ids = nodes.map(({ bo }) => bo.id)
   // 删除已被移除的节点条目
   taskInfo.value = taskInfo.value.filter((t) => ids.includes(t.id))
-  // 追加新增节点的默认条目
+  // 追加新增节点的默认条目；已有条目同步画布标准属性
   nodes.forEach(({ bo }) => {
-    if (!taskInfo.value.some((t) => t.id === bo.id && t.$type === bo.$type)) {
+    let entry = taskInfo.value.find((t) => t.id === bo.id)
+    if (entry && entry.$type !== bo.$type) {
+      // 元素类型替换：移除旧条目，按新类型重建
+      taskInfo.value = taskInfo.value.filter((t) => t.id !== bo.id)
+      entry = null
+    }
+    if (!entry) {
       taskInfo.value.push(defaultTaskInfoEntry(bo))
+    } else {
+      // 画布上修改的标准属性（如双击标签改名的 name）同步回 taskInfo，属性面板实时显示
+      entry.name = bo.name || ''
     }
   })
 }
