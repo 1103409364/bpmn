@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 // bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。
 // 内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
 import BpmnModeler from 'bpmn-js/lib/Modeler'
@@ -73,8 +73,9 @@ let bpmnXml = ''
 // bpmn-auto-layout 的 layoutProcess：懒加载，首次自动布局时动态 import
 let layoutProcess = null
 
-// 当前选中的元素信息（用于右侧属性面板定位）
-const activeElement = ref(null)
+// 当前选中的元素信息（用于右侧属性面板定位）。
+// 必须用 shallowRef：bpmn-js 元素含非可配置属性（如 labels），深度代理会导致 updateProperties 抛错、节点标签不刷新
+const activeElement = shallowRef(null)
 // 流程节点属性数据（唯一数据源）：与画布元素通过 id + $type 一一对应
 // 自定义属性（progressBarName / executeType / taskType / handleStrategy）仅存于内存，
 // 不写入 BPMN XML；标准 name 属性会同步回 businessObject 以更新节点标签并随 XML 保存

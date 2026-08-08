@@ -76,19 +76,20 @@ bpmn/
 
 | Event | 说明 |
 | --- | --- |
-| `saved` | 点击保存后触发，参数为完整的 `formBean` 对象（包含 bpmn、taskInfo、表单数据） |
-| `command-stack-changed` | 画布内容变更时触发 |
-| `update:formData` | 表单元数据变更时触发（支持 v-model 双向绑定） |
+| `saved` | 保存完成通知（无参数），完整数据已通过 `update:formData` 同步给父组件 |
+| `update:formData` | formBean / 表单元数据变更时触发（支持 v-model 双向绑定） |
 
 **Exposed 方法：**
 
 | 方法 | 说明 |
 | --- | --- |
-| `save()` | 保存当前流程，返回完整的 formBean |
+| `save(extra)` | 保存当前流程，序列化 XML 并通过 `v-model:form-data` 同步完整 formBean |
+| `getFormBean(extra)` | 不触发保存，直接返回当前状态的 formBean |
+| `getXml()` | 获取最近一次序列化的 XML 字符串 |
+| `taskInfo` | 节点属性数组（ref，唯一数据源） |
 | `download(type)` | 下载文件，`type` 为 `'xml'` 或 `'svg'` |
-| `getXml()` | 获取已保存的 XML 字符串 |
-| `getTaskInfo()` | 获取所有节点的自定义属性 (taskInfo 数组) |
 | `undo()` / `redo()` | 撤销 / 重做 |
+| `autoLayout()` | 对流程自动排版并重新导入画布 |
 
 ### PropertyPanel.vue
 
@@ -134,6 +135,56 @@ bpmn/
 ```
 
 父组件可通过监听 `saved` 事件获取 formBean，然后上传到数据库。
+
+## 属性面板与流程图画布同步机制
+
+属性面板（PropertyPanel）与 bpmn-js 画布通过 `taskInfo` 数组 + `activeElement` 两个核心数据源联动：
+
+### 数据源约定
+
+- **taskInfo 数组**：节点属性的唯一数据源，元素通过 `id + $type` 与画布元素一一对应
+- **activeElement**：当前选中的 bpmn-js 元素（`shallowRef`，详见"注意事项"）
+- **formData 对象**：未选中节点时编辑的流程表单元数据
+
+### 同步流程
+
+```txt
+① 选中联动
+[画布节点] ──click──> selection.changed ──> activeElement = newSelection[0]
+                                                  │
+② 属性编辑                                         ▼
+[属性面板 input] ──@input──> emit('change', { key, value }) ──> onTaskInfoChange
+                                                                     │
+                        ┌────────────────────────────────────────────┘
+                        ▼
+            entry[key] = value        （taskInfo 内存同步，画布即时响应）
+                        │
+                        └── key === 'name' ?
+                            ├─ 否：仅存内存，不写 XML
+                            └─ 是：modeling.updateProperties(element, { name })
+                                      │
+                                      ├─> LabelBehavior.updateLabel ──> 画布节点标签刷新
+                                      ├─> 进入 commandStack（支持撤销/重做）
+                                      └─> commandStack.changed ──> syncTaskInfo()
+                                                                       │
+                                                                       └─> taskInfo 与画布元素对齐
+```
+
+### 三个关键机制
+
+1. **选中联动**：`selection.changed` 事件把当前选中的第一个元素写入 `activeElement`，属性面板据此定位对应的 taskInfo 条目并展示可编辑字段。
+
+2. **name 标准属性回写**：节点名称是标准 BPMN 属性。修改时调用 `modeling.updateProperties(element, { name })`，经 `commandStack` 执行 `element.updateProperties` 命令，`LabelBehavior` 在 `postExecute` 中调用 `modeling.updateLabel` 刷新画布标签，同时该操作进入撤销栈，并随 `saveXML` 写入 BPMN XML。
+
+3. **自定义属性仅存内存**：`progressBarName`、`executeType`、`taskType`、`handleStrategy` 等只存在 taskInfo 数组中，不写入 XML；保存时通过 `JSON.stringify(taskInfo)` 序列化到 formBean.taskInfo。
+
+### 元素增删的自动对齐
+
+`commandStack.changed` 触发时执行 `syncTaskInfo()`：
+
+- 删除画布中已不存在的元素条目
+- 为 palette 新增的元素追加默认条目
+- 已有条目（按 `id + $type` 匹配）保留其自定义属性值，不会丢失
 
 ## 示例流程
 
@@ -343,6 +394,46 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 ### 依赖注入架构
 
 bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、translateModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
+
+## 注意事项
+
+### 1. activeElement 必须使用 shallowRef
+
+`BpmnModeler.vue` 中 `activeElement` 保存的是 bpmn-js 元素对象，**必须用 `shallowRef` 而不是 `ref`**。
+
+bpmn-js 元素含非可配置的属性（如 `labels`），如果用 `ref` 声明，Vue 会把元素深度包装成 `reactive` 代理。调用 `modeling.updateProperties` 时 bpmn-js 内部读取这些属性会抛出：
+
+```
+TypeError: 'get' on proxy: property 'labels' is a read-only and non-configurable
+data property on the proxy target but the proxy did not return its actual value
+```
+
+结果表现为：属性面板中修改节点名称后，画布上的节点标签不刷新（命令中断在抛出异常处）。改用 `shallowRef` 后元素保持原始对象，命令正常执行。
+
+### 2. taskInfo 是唯一数据源，不要直接改 businessObject
+
+- 修改 `name` 时必须走 `modeling.updateProperties`，让命令进入撤销栈、刷新标签并写入 XML
+- 自定义属性（`progressBarName`、`executeType` 等）仅存内存，**刷新页面会丢失**，需要持久化时必须在保存后由业务侧将 formBean.taskInfo 落库
+
+### 3. 属性面板采用单向数据流
+
+PropertyPanel 输入框用 `:value` + `@input` 绑定，通过 `change` 事件把 `{ key, value }` 抛给父组件，由父组件更新 taskInfo。**不要在子组件内直接修改 `props.taskInfo`**，否则会破坏"唯一数据源"约束。
+
+### 4. 多选元素只取第一个
+
+`selection.changed` 中只处理 `newSelection[0]`，多选时仅第一个元素进入属性面板。目前不支持批量编辑。
+
+### 5. 自动布局会重建元素实例
+
+`autoLayout()` 通过 bpmn-auto-layout 重算坐标后重新 `importXML`，所有元素实例会重建。因此代码在重新导入后必须再次调用 `syncTaskInfo()`（按 id 对齐，保留自定义属性）并手动刷新命令栈状态；`importXML` 会清空命令栈，导致无法撤销自动布局。
+
+### 6. 保存是"画布 XML"与"内存 taskInfo"两份数据的合并
+
+`saveXML` 只序列化画布状态（含标准属性如 `name`），自定义属性不会出现在 XML 中，由 `JSON.stringify(taskInfo)` 单独序列化进 formBean.taskInfo。两者靠元素 `id` 关联，读取时需按 id 合并。
+
+### 7. 自定义 palette / i18n 模块要遵循 DI 注入
+
+新增模块（palette、翻译等）需通过 `additionalModules` 注册，并保持 `$inject` 声明的依赖注入写法，否则 bpmn-js 无法解析。
 
 ## License
 
