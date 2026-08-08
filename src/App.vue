@@ -44,8 +44,8 @@ function onCommandChanged() {
     <BpmnModeler
       ref="modelerRef"
       :xml="initialXml"
-      title="BPMN 流程设计器"
-      :form-data="formData"
+      :title="formData.workflowName"
+      v-model:form-data="formData"
       @saved="onSaved"
       @command-stack-changed="onCommandChanged"
     />

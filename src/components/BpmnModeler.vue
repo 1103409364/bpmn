@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 // bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。
 // 内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
 import BpmnModeler from 'bpmn-js/lib/Modeler'
@@ -13,6 +13,8 @@ import initialXml from '../assets/bpmn/initial.bpmn?raw'
 import 'diagram-js-accordion-palette/assets/index.css'
 // 自定义属性编辑器组件：展示/编辑当前选中元素的 taskInfo 条目
 import TaskInfoPanel from './properties/TaskInfoPanel.vue'
+// 基础信息编辑器组件：未选中元素时默认展示，编辑流程表单元数据
+import BasicInfoPanel from './properties/BasicInfoPanel.vue'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -27,6 +29,7 @@ const props = defineProps({
     default: ''
   },
   // 父组件传入的流程表单元数据（workflowCode / workflowName / workflowType / publishedFlag 等），
+  // 支持 v-model:form-data 双向绑定：未选中元素时右侧基础信息编辑器会修改它，
   // 保存时与 bpmn、taskInfo 一起合并进 formBean，供数据库最终落库
   formData: {
     type: Object,
@@ -34,10 +37,22 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['command-stack-changed', 'saved'])
+const emit = defineEmits(['command-stack-changed', 'saved', 'update:formData'])
 
 // 模板 ref：modeler 的容器(canvas)由 Vue 渲染出来，再用原生 DOM 交给 bpmn-js
 const canvasRef = ref(null)
+
+// 本地 formData 副本：右侧基础信息编辑器直接修改它，改动后同步回父组件
+const formDataLocal = ref({ ...props.formData })
+
+// 父组件传入的 formData 变化时同步进本地副本（如从数据库回显）
+watch(
+  () => props.formData,
+  (val) => {
+    formDataLocal.value = { ...formDataLocal.value, ...val }
+  },
+  { deep: true }
+)
 
 // modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
@@ -218,6 +233,14 @@ function onTaskInfoChange({ key, value }) {
 }
 
 /**
+ * 基础信息编辑器 change 事件处理：更新本地 formData 并同步回父组件（v-model:form-data）
+ */
+function onFormDataChange({ key, value }) {
+  formDataLocal.value = { ...formDataLocal.value, [key]: value }
+  emit('update:formData', { ...formDataLocal.value })
+}
+
+/**
  * 手风琴 palette 收起/展开：
  * - 展开时顶部工具栏提供"收起"按钮，点击后隐藏 palette
  * - 隐藏后只留一个左上角的小手柄，点击即可重新展开
@@ -319,7 +342,7 @@ function buildFormBean(extra = {}) {
     newFlag: '',
     taskInfo: JSON.stringify(taskInfo.value),
     processBarInfo: [],
-    ...props.formData,
+    ...formDataLocal.value,
     ...extra,
     // bpmn / taskInfo 始终取当前实时状态
     bpmn: bpmnXml,
@@ -419,8 +442,14 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
     </div>
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
-      <div class="bpmn-panel" v-show="modelerReady && activeElement">
-        <TaskInfoPanel :element="activeElement" :task-info="taskInfo" @change="onTaskInfoChange" />
+      <div class="bpmn-panel" v-show="modelerReady">
+        <TaskInfoPanel
+          v-if="activeElement"
+          :element="activeElement"
+          :task-info="taskInfo"
+          @change="onTaskInfoChange"
+        />
+        <BasicInfoPanel v-else :form-data="formDataLocal" @change="onFormDataChange" />
       </div>
     </div>
   </div>
