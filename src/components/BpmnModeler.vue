@@ -11,6 +11,8 @@ import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
 import initialXml from '../assets/bpmn/initial.bpmn?raw'
 // 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
 import 'diagram-js-accordion-palette/assets/index.css'
+// 自定义属性编辑器组件：展示/编辑当前选中元素的 taskInfo 条目
+import TaskInfoPanel from './properties/TaskInfoPanel.vue'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -23,14 +25,19 @@ const props = defineProps({
   title: {
     type: String,
     default: ''
+  },
+  // 父组件传入的流程表单元数据（workflowCode / workflowName / workflowType / publishedFlag 等），
+  // 保存时与 bpmn、taskInfo 一起合并进 formBean，供数据库最终落库
+  formData: {
+    type: Object,
+    default: () => ({})
   }
 })
 
 const emit = defineEmits(['command-stack-changed', 'saved'])
 
-// 模板 ref：modeler 的容器(canvas)和属性面板挂载点(panel)由 Vue 渲染出来，再用原生 DOM 交给 bpmn-js
+// 模板 ref：modeler 的容器(canvas)由 Vue 渲染出来，再用原生 DOM 交给 bpmn-js
 const canvasRef = ref(null)
-const panelRef = ref(null)
 
 // modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
@@ -39,10 +46,12 @@ const modelerReady = ref(false)
 // 保存后的流程 XML 字符串
 let bpmnXml = ''
 
-// 当前选中的元素信息（用于右侧属性面板头部展示）
+// 当前选中的元素信息（用于右侧属性面板定位）
 const activeElement = ref(null)
-const elementId = ref('')
-const elementType = ref('')
+// 流程节点属性数据（唯一数据源）：与画布元素通过 id + $type 一一对应
+// 自定义属性（progressBarName / executeType / taskType / handleStrategy）仅存于内存，
+// 不写入 BPMN XML；标准 name 属性会同步回 businessObject 以更新节点标签并随 XML 保存
+const taskInfo = ref([])
 // 撤销/重做按钮是否可用
 const canUndo = ref(false)
 const canRedo = ref(false)
@@ -53,9 +62,7 @@ const isSaving = ref(false)
  * 动态 import 两个包：它们体积较大，只在用到时加载，可以减小首屏体积。
  */
 async function initModeler() {
-  // BpmnPropertiesPanelModule：属性面板模块（additionalModules 注入到 modeler 中）
-  const { BpmnPropertiesPanelModule } = await import('bpmn-js-properties-panel')
-  // Camunda 的 moddle 扩展定义（JSON）：让属性面板能识别并编辑 camunda:* 扩展属性
+  // Camunda 的 moddle 扩展定义（JSON）：保证解析带 camunda:* 扩展属性的流程 XML
   const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
   // 自定义 palette 模块：保留默认工具栏的基础上扩展额外工具
   const { paletteModule } = await import('./palette/index')
@@ -70,12 +77,8 @@ async function initModeler() {
   modeler = new BpmnModeler({
     // container: 画布挂载到哪个 DOM 元素（bpmn-js 会在此元素内渲染 svg 图形）
     container: canvasRef.value,
-    propertiesPanel: {
-      // parent: 属性面板渲染到哪个 DOM 元素（挂在右侧面板内）
-      parent: panelRef.value
-    },
-    // additionalModules: 额外注册的模块，属性面板本身就是一个模块
-    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule, AccordionPaletteModule, gridModule],
+    // additionalModules: 额外注册的模块（自定义 palette、手风琴 palette、网格、中文本地化）
+    additionalModules: [paletteModule, translateModule, AccordionPaletteModule, gridModule],
     // accordionPalette: 手风琴 palette 的配置
     accordionPalette: {
       showName: false, // 显示工具名称
@@ -95,6 +98,9 @@ async function initModeler() {
     console.error('导入流程失败:', err)
   }
 
+  // 根据画布元素初始化 taskInfo（自定义属性默认置空，name 取自 businessObject）
+  syncTaskInfo()
+
   // canvas service：负责图形的缩放、平移、视图定位
   const canvas = modeler.get('canvas')
   // 第二个参数 'auto'：以视口中心为锚点，让整个流程图在画布中居中（缩放上限为 1，小图不会被放大）
@@ -105,21 +111,13 @@ async function initModeler() {
 
   // selection.changed：选中元素发生变化时触发，newSelection 是当前选中的元素数组
   eventBus.on('selection.changed', ({ newSelection }) => {
-    const element = newSelection && newSelection[0]
-    if (element) {
-      activeElement.value = element
-      elementId.value = element.id
-      // businessObject: 元素对应的 BPMN 业务模型对象，$type 如 'bpmn:UserTask'
-      elementType.value = element.businessObject?.$type || ''
-    } else {
-      activeElement.value = null
-      elementId.value = ''
-      elementType.value = ''
-    }
+    activeElement.value = newSelection && newSelection[0]
   })
 
   // commandStack.changed：任何编辑操作（增删改）发生后触发，借此刷新撤销/重做按钮
   eventBus.on('commandStack.changed', () => {
+    // 画布上新增/删除了节点时，同步 taskInfo（已有条目的自定义属性保留）
+    syncTaskInfo()
     updateCommandState()
     emit('command-stack-changed')
   })
@@ -130,6 +128,93 @@ async function initModeler() {
 
   // 为手风琴 palette 挂载收起按钮：点击收起隐藏，点击左上角手柄重新展开
   setupPaletteCollapse()
+}
+
+// 不作为流程节点（无 taskInfo 条目）的图形元素类型
+const NON_FLOW_NODE_TYPES = [
+  'bpmn:Process',
+  'bpmn:Collaboration',
+  'bpmn:Participant',
+  'bpmn:Lane',
+  'bpmn:TextAnnotation',
+  'bpmn:Group',
+  'bpmn:DataObjectReference',
+  'bpmn:DataStoreReference'
+]
+
+/**
+ * 收集画布上所有流程节点（含连线、泳道等被排除）
+ * 返回 { element, bo } 列表，bo 为对应的 businessObject
+ */
+function collectFlowNodes() {
+  const elementRegistry = modeler.get('elementRegistry')
+  const nodes = []
+  elementRegistry.getAll().forEach((element) => {
+    // 连线（SequenceFlow/Association 等）带 waypoints，直接跳过
+    if (element.waypoints) return
+    const bo = element.businessObject
+    if (!bo || typeof bo.$type !== 'string' || !bo.$type.startsWith('bpmn:')) return
+    if (NON_FLOW_NODE_TYPES.includes(bo.$type)) return
+    nodes.push({ element, bo })
+  })
+  return nodes
+}
+
+/**
+ * 生成某个流程节点的默认 taskInfo 条目。
+ * 自定义属性（progressBarName 等）仅在内存中维护，默认置空；name 取自 businessObject
+ */
+function defaultTaskInfoEntry(bo) {
+  const entry = {
+    $type: bo.$type,
+    id: bo.id,
+    name: bo.name || '',
+    progressBarName: ''
+  }
+  if (bo.$type === 'bpmn:UserTask') {
+    entry.executeType = ''
+    entry.taskType = ''
+    entry.handleStrategy = ''
+  }
+  return entry
+}
+
+/**
+ * 把画布元素与 taskInfo 对齐：
+ * - 画布中已删除的元素，从 taskInfo 中移除
+ * - 画布中新增的元素（如从 palette 拖入），追加默认条目
+ * - 已存在的条目保留其自定义属性值
+ */
+function syncTaskInfo() {
+  if (!modeler) return
+  const nodes = collectFlowNodes()
+  const ids = nodes.map(({ bo }) => bo.id)
+  // 删除已被移除的节点条目
+  taskInfo.value = taskInfo.value.filter((t) => ids.includes(t.id))
+  // 追加新增节点的默认条目
+  nodes.forEach(({ bo }) => {
+    if (!taskInfo.value.some((t) => t.id === bo.id && t.$type === bo.$type)) {
+      taskInfo.value.push(defaultTaskInfoEntry(bo))
+    }
+  })
+}
+
+/**
+ * 属性面板 change 事件处理：更新 taskInfo。
+ * name 是标准 BPMN 属性，同步回 businessObject 更新节点标签并随 XML 保存；
+ * 其余自定义属性仅存于内存 taskInfo，不写入 XML
+ */
+function onTaskInfoChange({ key, value }) {
+  const element = activeElement.value
+  if (!element) return
+  const bo = element.businessObject
+  const entry = taskInfo.value.find((t) => t.id === bo.id && t.$type === bo.$type)
+  if (!entry) return
+  entry[key] = value
+  if (key === 'name') {
+    // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈
+    modeler.get('modeling').updateProperties(element, { name: value })
+  }
 }
 
 /**
@@ -215,21 +300,56 @@ function resetZoom() {
 }
 
 /**
- * 保存流程：把画布上的所有改动序列化回 BPMN XML
+ * 组装最终落库的 formBean：
+ * - bpmn：序列化后的流程 XML
+ * - taskInfo：节点属性 JSON 字符串（唯一数据源）
+ * - 其余为流程表单元数据，父组件可通过 formData prop 或 save/getFormBean 的 extra 参数覆盖
+ * - processBarInfo 为进度条信息，默认空数组，由业务侧填充
+ */
+function buildFormBean(extra = {}) {
+  return {
+    workflowCode: '',
+    workflowName: '',
+    workflowType: 'W',
+    publishedFlag: '1',
+    bpmn: bpmnXml,
+    workflowParam: '',
+    modelId: '',
+    version: '',
+    newFlag: '',
+    taskInfo: JSON.stringify(taskInfo.value),
+    processBarInfo: [],
+    ...props.formData,
+    ...extra,
+    // bpmn / taskInfo 始终取当前实时状态
+    bpmn: bpmnXml,
+    taskInfo: JSON.stringify(taskInfo.value)
+  }
+}
+
+/**
+ * 保存流程：把画布上的所有改动序列化回 BPMN XML，组装 formBean 并通过 saved 事件抛出
  * saveXML 是 importXML 的逆操作
  */
-async function save() {
+async function save(extra = {}) {
   if (!modeler) return
   isSaving.value = true
   try {
     const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
     bpmnXml = xml
-    emit('saved', xml)
+    emit('saved', buildFormBean(extra))
   } catch (err) {
     console.error('保存失败:', err)
   } finally {
     isSaving.value = false
   }
+}
+
+/**
+ * 不触发保存，直接返回当前状态的 formBean（bpmn 为最近一次序列化结果，未保存过则为空）
+ */
+function getFormBean(extra = {}) {
+  return buildFormBean(extra)
 }
 
 function getXml() {
@@ -258,7 +378,7 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
-// onMounted 后再初始化：确保 canvasRef/panelRef 对应的 DOM 已经渲染到页面中
+// onMounted 后再初始化：确保 canvasRef 对应的 DOM 已经渲染到页面中
 onMounted(async () => {
   await nextTick()
   initModeler()
@@ -270,7 +390,7 @@ onBeforeUnmount(() => {
 })
 
 // 暴露给父组件调用的方法
-defineExpose({ save, download, getXml, undo, redo })
+defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 </script>
 
 <template>
@@ -300,13 +420,7 @@ defineExpose({ save, download, getXml, undo, redo })
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
       <div class="bpmn-panel" v-show="modelerReady && activeElement">
-        <template v-if="activeElement">
-          <div class="bpmn-panel-head">
-            <div class="bpmn-panel-title">{{ elementType.replace('bpmn:', '') }}</div>
-            <div class="bpmn-panel-id">{{ elementId }}</div>
-          </div>
-          <div class="bpmn-panel-body" ref="panelRef"></div>
-        </template>
+        <TaskInfoPanel :element="activeElement" :task-info="taskInfo" @change="onTaskInfoChange" />
       </div>
     </div>
   </div>
@@ -420,28 +534,6 @@ defineExpose({ save, download, getXml, undo, redo })
   overflow-y: auto;
   flex-shrink: 0;
 }
-
-.bpmn-panel-head {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.bpmn-panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.bpmn-panel-id {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #9ca3af;
-  word-break: break-all;
-}
-
-.bpmn-panel-body {
-  padding: 8px;
-}
 </style>
 
 <style>
@@ -520,22 +612,5 @@ defineExpose({ save, download, getXml, undo, redo })
 
 .djs-accordion-palette.djs-palette:not(.open) .djs-accordion-palette-handle {
   display: flex;
-}
-
-.bpmn-panel-body .bio-properties-panel {
-  --color-000000: #111827;
-  --color-ffffff: #ffffff;
-  --color-grey-225-10-15: #374151;
-  --color-grey-225-10-35: #6b7280;
-  --color-grey-225-10-55: #9ca3af;
-  --color-grey-225-10-75: #d1d5db;
-  --color-grey-225-10-90: #e5e7eb;
-  --color-grey-225-10-95: #f3f4f6;
-  --color-blue-205-100-45: #10b981;
-  --color-blue-205-100-50: #059669;
-  --color-blue-205-100-55: #059669;
-  --color-blue-205-100-80: #a7f3d0;
-  --color-green-150-50-40: #059669;
-  --color-red-360-100-45: #ef4444;
 }
 </style>

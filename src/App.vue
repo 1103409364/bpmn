@@ -6,8 +6,8 @@ import initialXml from './assets/bpmn/initial.bpmn?raw'
 
 // 子组件实例引用：可通过 modelerRef.value.save() 等方式调用组件暴露的方法
 const modelerRef = ref(null)
-// 保存成功后返回的流程 XML
-const savedXml = ref('')
+// 保存成功后返回的流程 formBean（bpmn + taskInfo + 表单元数据，供数据库落库）
+const savedFormBean = ref(null)
 // 页面右上角的轻提示文案，空字符串表示不显示
 const toast = ref('')
 
@@ -19,11 +19,19 @@ function showToast(msg) {
   toastTimer = setTimeout(() => (toast.value = ''), 2500)
 }
 
-// 监听子组件 saved 事件：拿到序列化后的流程 XML
-function onSaved(xml) {
-  savedXml.value = xml
+// 监听子组件 saved 事件：拿到序列化后的 formBean
+function onSaved(formBean) {
+  savedFormBean.value = formBean
   showToast('流程保存成功')
 }
+
+// 流程表单元数据：与 bpmn / taskInfo 一起合并进 formBean 落库
+const formData = ref({
+  workflowCode: 'DEMO',
+  workflowName: '请假审批流程',
+  workflowType: 'W',
+  publishedFlag: '1'
+})
 
 // 监听 command-stack-changed：画布内容有改动时提醒用户保存
 function onCommandChanged() {
@@ -37,11 +45,13 @@ function onCommandChanged() {
       ref="modelerRef"
       :xml="initialXml"
       title="BPMN 流程设计器"
+      :form-data="formData"
       @saved="onSaved"
       @command-stack-changed="onCommandChanged"
     />
-    <div v-if="savedXml" class="flow-info">
-      已保存的流程定义大小: {{ (savedXml.length / 1024).toFixed(1) }} KB
+    <div v-if="savedFormBean" class="flow-info">
+      流程 XML: {{ (savedFormBean.bpmn.length / 1024).toFixed(1) }} KB /
+      taskInfo: {{ (savedFormBean.taskInfo.length / 1024).toFixed(1) }} KB
     </div>
     <transition name="fade">
       <div v-if="toast" class="flow-toast">{{ toast }}</div>
