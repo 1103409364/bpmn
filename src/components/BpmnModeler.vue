@@ -93,7 +93,8 @@ async function initModeler() {
 
   // canvas service：负责图形的缩放、平移、视图定位
   const canvas = modeler.get('canvas')
-  canvas.zoom('fit-viewport') // 让整个流程图自动缩放并居中
+  // 第二个参数 'auto'：以视口中心为锚点，让整个流程图在画布中居中（缩放上限为 1，小图不会被放大）
+  canvas.zoom('fit-viewport', 'auto')
 
   // eventBus service：bpmn-js 的事件总线，所有交互都通过它发布/订阅事件
   const eventBus = modeler.get('eventBus')
@@ -433,15 +434,6 @@ defineExpose({ save, download, getXml, undo, redo })
 
 .bpmn-panel-body {
   padding: 8px;
-}
-
-.bpmn-panel-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 120px;
-  color: #9ca3af;
-  font-size: 13px;
 }
 </style>
 
