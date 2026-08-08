@@ -127,6 +127,10 @@ async function initModeler() {
   // selection.changed：选中元素发生变化时触发，newSelection 是当前选中的元素数组
   eventBus.on('selection.changed', ({ newSelection }) => {
     activeElement.value = newSelection && newSelection[0]
+    // 选中元素时自动显示属性面板
+    if (newSelection && newSelection[0]) {
+      panelVisible.value = true
+    }
   })
 
   // commandStack.changed：任何编辑操作（增删改）发生后触发，借此刷新撤销/重做按钮
