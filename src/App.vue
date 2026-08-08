@@ -1,21 +1,22 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
 import Toast from './components/toast/Toast.vue'
 import { useToast } from './composables/useToast.js'
 // ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理） 把示例流程 XML 以纯文本导入，作为设计器初始内容
-import initialXml from './assets/bpmn/initial.bpmn?raw'
+import defaultBpmn from './assets/bpmn/default.bpmn?raw'
+import testXml from './assets/bpmn/initial.bpmn?raw'
 
 // 子组件实例引用：可通过 modelerRef.value.save() 等方式调用组件暴露的方法
 const modelerRef = ref(null)
-// 单一数据源：流程表单元数据 + bpmn + taskInfo，供数据库落库。
-// 初始化时 bpmn 取 initialXml，taskInfo 为空数组 JSON；saved 事件后用最新序列化结果整体替换
+
+// 单一数据源：流程表单元数据 + bpmn + taskInfo，供数据库落库。 saved 事件后用最新序列化结果整体替换
 const formBean = ref({
   workflowCode: 'DEMO',
   workflowName: '请假审批流程',
   workflowType: 'W',
   publishedFlag: '1',
-  bpmn: initialXml,
+  bpmn: defaultBpmn,
   taskInfo: '[]'
 })
 // 页面右上角的轻提示（渲染在 <Toast /> 中，这里只取触发函数）
@@ -25,14 +26,29 @@ const { showToast } = useToast()
 function onSaved() {
   showToast('流程保存成功')
 }
+
+// 模拟异步加载：组件挂载后通过定时器模拟从后端获取数据并调用子组件的 loadFormData
+onMounted(() => {
+  setTimeout(() => {
+    const asyncData = {
+      workflowCode: 'ASYNC',
+      workflowName: '异步加载流程示例',
+      workflowType: 'W',
+      publishedFlag: '1',
+      bpmn: testXml,
+      taskInfo: '[]'
+    }
+    // loadFormData 触发 v-model:form-data 的更新，taskInfo 计算属性 set 触发
+     modelerRef.value?.loadFormData(asyncData)
+    showToast('异步加载完成')
+  }, 2500)
+})
 </script>
 
 <template>
   <div class="flow-page">
     <BpmnModeler
       ref="modelerRef"
-      :xml="formBean.bpmn"
-      :title="formBean.workflowName"
       v-model:form-data="formBean"
       @saved="onSaved"
     />

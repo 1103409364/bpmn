@@ -16,16 +16,6 @@ import ModelerToolbar from './toolbar/ModelerToolbar.vue'
 
 // 组件对外暴露的属性
 const props = defineProps({
-  // 父组件传入的 BPMN XML 字符串；为空时加载内置示例流程
-  xml: {
-    type: String,
-    default: ''
-  },
-  // 设计器顶部标题
-  title: {
-    type: String,
-    default: ''
-  },
   // 父组件传入的流程表单元数据（workflowCode / workflowName / workflowType / publishedFlag 等），
   // 支持 v-model:form-data 双向绑定：未选中元素时右侧基础信息编辑器会修改它，
   // 保存时与 bpmn、taskInfo 一起合并进 formBean，供数据库最终落库
@@ -53,15 +43,6 @@ const formDataModel = computed({
   }
 })
 
-// 父组件传入的 formData 变化时同步进本地副本（如从数据库回显）
-watch(
-  () => props.formData,
-  (val) => {
-    formDataLocal.value = { ...formDataLocal.value, ...val }
-  },
-  { deep: true }
-)
-
 // modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
 // modeler 初始化完成标志（响应式）：用于控制顶部工具栏、属性面板的显示
@@ -72,10 +53,27 @@ let layoutProcess = null
 // 当前选中的元素信息（用于右侧属性面板定位）。
 // 必须用 shallowRef：bpmn-js 元素含非可配置属性（如 labels），深度代理会导致 updateProperties 抛错、节点标签不刷新
 const activeElement = shallowRef(null)
-// 流程节点属性数据（唯一数据源）：与画布元素通过 id + $type 一一对应
-// 自定义属性（progressBarName / executeType / taskType / handleStrategy）仅存于内存，
-// 不写入 BPMN XML；标准 name 属性会同步回 businessObject 以更新节点标签并随 XML 保存
-const taskInfo = ref([])
+
+// 流程节点属性数据（唯一数据源）：存储在 formDataLocal.bpmn 的 `taskInfo` 字段（JSON 字符串）
+// 用 computed 映射到数组，读写都通过 formDataLocal 保持单一数据源
+function parseTaskInfo() {
+  try {
+    return JSON.parse(formDataLocal.value.taskInfo || '[]')
+  } catch (e) {
+    return []
+  }
+}
+
+const taskInfo = computed({
+  get() {
+    return parseTaskInfo()
+  },
+  set(arr) {
+    formDataLocal.value = { ...formDataLocal.value, taskInfo: JSON.stringify(arr) }
+    emit('update:formData', formDataLocal.value)
+  }
+})
+
 // 撤销/重做按钮是否可用
 const canUndo = ref(false)
 const canRedo = ref(false)
@@ -86,7 +84,7 @@ const savedSnapshot = ref({ ...props.formData })
 // bpmn 比较前做归一化：撤销/重做后 bpmn-js 可能在 DI 中残留空的 <bpmndi:BPMNLabel />，
 // 这是无 bounds、无语义的空标签，与初始状态仅差这一个元素，归一化后视为一致
 function normalizeBpmn(xml) {
-  return xml
+  return (xml || '')
     .replace(/[ \t]*<bpmndi:BPMNLabel[ \t]*\/>[ \t]*\r?\n?/g, '')
     .replace(/[ \t]*<bpmndi:BPMNLabel[ \t]*>[ \t]*<\/bpmndi:BPMNLabel>[ \t]*\r?\n?/g, '')
 }
@@ -118,6 +116,40 @@ const isDirty = computed(() => !sameState(formDataLocal.value, savedSnapshot.val
 const panelVisible = ref(true)
 // 所有面板是否都已收起（用于切换按钮文案）
 const allPanelsCollapsed = ref(false)
+
+/**
+ * 核心导入逻辑：把 XML 载入 modeler 实例
+ */
+async function importDiagram(xml) {
+  if (!modeler || !xml) return
+  try {
+    await modeler.importXML(xml)
+  } catch (err) {
+    console.error('导入流程失败:', err)
+  }
+}
+
+/**
+ * 内部统一的数据应用与视图重构控制函数
+ */
+async function applyFormData(newFormData) {
+  if (!modeler || !newFormData) return
+  formDataLocal.value = { ...formDataLocal.value, ...newFormData }
+  
+  if (formDataLocal.value.bpmn) {
+    await importDiagram(formDataLocal.value.bpmn)
+  }
+
+  // 根据画布元素初始化 taskInfo
+  syncTaskInfo()
+  // 把实际加载的画布状态序列化进 formDataLocal
+  await refreshCanvasState()
+
+  // 视口自适应居中与尺寸刷新
+  const canvas = modeler.get('canvas')
+  canvas.resized()
+  canvas.zoom('fit-viewport', 'auto')
+}
 
 /**
  * 初始化 bpmn-js Modeler。
@@ -153,29 +185,14 @@ async function initModeler() {
     }
   })
 
-  // importXML: 把 BPMN XML 字符串导入并渲染到画布（这是最核心的入口之一）
-  try {
-    await modeler.importXML(props.xml || initialXml)
-  } catch (err) {
-    console.error('导入流程失败:', err)
-  }
-
-  // 根据画布元素初始化 taskInfo（自定义属性默认置空，name 取自 businessObject）
-  syncTaskInfo()
-  // 把实际加载的画布状态序列化进 formDataLocal，并以此为初始快照：
-  // 避免快照仍是父组件传入的旧 bpmn/空 taskInfo，导致初始即"脏"或撤销回原状仍显示脏
-  await refreshCanvasState()
+  // 统一加载初始数据并自适应视口
+  await applyFormData(formDataLocal.value)
   savedSnapshot.value = { ...formDataLocal.value }
-
-  // canvas service：负责图形的缩放、平移、视图定位
-  const canvas = modeler.get('canvas')
-  // 第二个参数 'auto'：以视口中心为锚点，让整个流程图在画布中居中（缩放上限为 1，小图不会被放大）
-  canvas.zoom('fit-viewport', 'auto')
 
   // eventBus service：bpmn-js 的事件总线，所有交互都通过它发布/订阅事件
   const eventBus = modeler.get('eventBus')
 
-  // selection.changed：选中元素发生变化时触发，newSelection 是当前选中的元素数组
+  // selection.changed：选中元素发生变化时触发
   eventBus.on('selection.changed', ({ newSelection }) => {
     activeElement.value = newSelection && newSelection[0]
     // 选中元素时自动显示属性面板
@@ -191,11 +208,22 @@ async function initModeler() {
   })
   updateCommandState()
 
-  // modeler 初始化完成，通知 Vue 重渲染以显示顶部工具栏
+  // modeler 初始化完成，通知 Vue 重渲染
   modelerReady.value = true
 
-  // 为手风琴 palette 挂载收起按钮：点击收起隐藏，点击左上角手柄重新展开
+  // 为手风琴 palette 挂载收起按钮
   setupPaletteCollapse()
+}
+
+/**
+ * 外部主动调用：用新的 formData 覆盖本地 state 并重新加载流程图。
+ * 常用于弹窗重用、组件未销毁时切换流程数据等场景。
+ */
+async function loadFormData(newFormData) {
+  if (!newFormData) return
+  await applyFormData(newFormData)
+  // 主动更新数据后重置快照，消除脏标记
+  savedSnapshot.value = { ...formDataLocal.value }
 }
 
 // 不作为流程节点（无 taskInfo 条目）的图形元素类型
@@ -233,7 +261,6 @@ function collectFlowNodes() {
 
 /**
  * 生成某个流程节点的默认 taskInfo 条目。
- * 自定义属性（progressBarName 等）仅在内存中维护，默认置空；name 取自 businessObject
  */
 function defaultTaskInfoEntry(bo) {
   const entry = {
@@ -262,23 +289,31 @@ function syncTaskInfo() {
   if (!modeler) return
   const nodes = collectFlowNodes()
   const ids = nodes.map(({ bo }) => bo.id)
+  // 基于 formData 中的 taskInfo 构建新的数组，避免原地修改导致不一致
+  let current = parseTaskInfo()
   // 删除已被移除的节点条目
-  taskInfo.value = taskInfo.value.filter((t) => ids.includes(t.id))
-  // 追加新增节点的默认条目；已有条目同步画布标准属性
+  current = current.filter((t) => ids.includes(t.id))
+  // 追加或更新节点条目；保持不可变赋值
   nodes.forEach(({ bo }) => {
-    let entry = taskInfo.value.find((t) => t.id === bo.id)
-    if (entry && entry.$type !== bo.$type) {
-      // 元素类型替换：移除旧条目，按新类型重建
-      taskInfo.value = taskInfo.value.filter((t) => t.id !== bo.id)
-      entry = null
-    }
-    if (!entry) {
-      taskInfo.value.push(defaultTaskInfoEntry(bo))
+    const idx = current.findIndex((t) => t.id === bo.id)
+    if (idx !== -1) {
+      const existing = current[idx]
+      if (existing.$type !== bo.$type) {
+        // 类型替换：用新条目替换
+        current = current.filter((t) => t.id !== bo.id)
+        current.push(defaultTaskInfoEntry(bo))
+      } else {
+        // 同步标准属性（name）
+        const updated = { ...existing, name: bo.name || '' }
+        current = current.slice()
+        current[idx] = updated
+      }
     } else {
-      // 画布上修改的标准属性（如双击标签改名的 name）同步回 taskInfo，属性面板实时显示
-      entry.name = bo.name || ''
+      current = current.slice()
+      current.push(defaultTaskInfoEntry(bo))
     }
   })
+  taskInfo.value = current
 }
 
 /**
@@ -312,15 +347,15 @@ function onTaskInfoChange({ key, value }) {
   const element = activeElement.value
   if (!element) return
   const bo = element.businessObject
-  const entry = taskInfo.value.find((t) => t.id === bo.id && t.$type === bo.$type)
-  if (!entry) return
-  entry[key] = value
+  const arr = parseTaskInfo()
+  const idx = arr.findIndex((t) => t.id === bo.id && t.$type === bo.$type)
+  if (idx === -1) return
+  const updated = { ...arr[idx], [key]: value }
+  arr[idx] = updated
+  taskInfo.value = arr
   if (key === 'name') {
     // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈（其后 commandStack.changed 会刷新实时状态）
     modeler.get('modeling').updateProperties(element, { name: value })
-  } else {
-    // 自定义属性不触发 commandStack.changed，手动把最新 taskInfo 同步进 formDataLocal 供脏检测
-    formDataLocal.value = { ...formDataLocal.value, taskInfo: JSON.stringify(taskInfo.value) }
   }
 }
 
@@ -450,7 +485,7 @@ function zoomOut() {
 
 function resetZoom() {
   const canvas = modeler.get('canvas')
-  canvas.resized();
+  canvas.resized()
   canvas.zoom('fit-viewport', 'auto')
 }
 
@@ -500,17 +535,12 @@ async function save(extra = {}) {
   }
 }
 
-
-
-// 下载导出：type 为 'xml' 或 'svg'
+// 下载导出
 async function download(type) {
   if (type === 'xml') {
-    // 直接序列化当前画布状态导出，不经过 save()：
-    // 避免下载附带"清脏/更新快照"副作用，也保证下载的是最新（含未保存修改）的 XML
     const { xml } = await modeler.saveXML({ format: true })
     downloadBlob(new Blob([xml], { type: 'application/xml' }), 'diagram.bpmn')
   } else {
-    // saveSVG: 导出画布当前视图为 SVG 矢量图
     const { svg } = await modeler.saveSVG()
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg')
   }
@@ -532,19 +562,20 @@ onMounted(async () => {
   await initModeler()
 })
 
+
 // 组件销毁时释放 modeler 实例，避免内存泄漏和事件残留
 onBeforeUnmount(() => {
   if (modeler) modeler.destroy()
 })
 
 // 暴露给父组件调用的方法
-defineExpose({ save, download, undo, redo, autoLayout, taskInfo })
+defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
 </script>
 
 <template>
   <div class="bpmn-page">
     <ModelerToolbar
-      :title="title"
+      :title="formDataLocal.workflowName || '流程设计器'"
       :modeler-ready="modelerReady"
       :can-undo="canUndo"
       :can-redo="canRedo"
@@ -625,10 +656,12 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo })
   margin-bottom: 4px;
   border-bottom: 1px solid #e5e7eb;
 }
+
 .djs-accordion-palette.open {
   width: 160px;
   border-radius: 6px;
 }
+
 .djs-accordion-palette.open .djs-accordion-palette-toolbar {
   display: flex;
 }
