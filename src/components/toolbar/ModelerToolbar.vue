@@ -26,6 +26,11 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  // 是否存在未保存的修改：为 true 时保存按钮显示提醒标记
+  isDirty: {
+    type: Boolean,
+    default: false
+  },
   // 所有面板是否已收起（用于预览按钮的高亮与提示）
   allPanelsCollapsed: {
     type: Boolean,
@@ -115,13 +120,19 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
           </svg>
           <span>下载XML</span>
         </button>
-        <button class="bpmn-btn bpmn-btn-primary" :disabled="isSaving" @click="emit('save')">
+        <button
+          class="bpmn-btn bpmn-btn-primary bpmn-btn-save"
+          :disabled="isSaving"
+          @click="emit('save')"
+          :title="isDirty ? '有未保存的修改' : '保存'"
+        >
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M17 21v-8H7v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M7 3v5h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <span>{{ isSaving ? '保存中...' : '保存' }}</span>
+          <span v-if="isDirty" class="bpmn-btn-dirty-dot" title="有未保存的修改"></span>
         </button>
       </template>
     </div>
@@ -229,6 +240,21 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
   background: #059669;
   border-color: #059669;
   color: #fff;
+}
+
+/* 保存按钮有未保存修改时的提醒标记（类似 VS Code 文件变更后的 tab 圆点） */
+.bpmn-btn-save {
+  position: relative;
+}
+
+.bpmn-btn-dirty-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
 }
 
 .bpmn-divider {

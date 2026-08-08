@@ -15,8 +15,6 @@ import 'diagram-js-accordion-palette/assets/index.css'
 import PropertyPanel from './properties/PropertyPanel.vue'
 // 顶部工具栏组件：标题 + 撤销/重做 + 缩放 + 预览 + 下载 + 保存
 import ModelerToolbar from './toolbar/ModelerToolbar.vue'
-// 轻提示：画布改动、保存成功等反馈在组件内部直接触发（单例状态驱动全局 Toast）
-import { useToast } from '../composables/useToast.js'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -40,9 +38,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['saved', 'update:formData'])
-
-// 轻提示触发函数：组件内部反馈（画布变更、保存成功）
-const { showToast } = useToast()
 
 // 模板 ref：modeler 的容器(canvas)由 Vue 渲染出来，再用原生 DOM 交给 bpmn-js
 const canvasRef = ref(null)
@@ -86,6 +81,25 @@ const taskInfo = ref([])
 const canUndo = ref(false)
 const canRedo = ref(false)
 const isSaving = ref(false)
+// 画布是否有编辑操作（commandStack.changed 置 true，保存成功后置 false）
+const canvasDirty = ref(false)
+// formBean 快照：初始为挂载时的数据，保存成功时更新为完整 formBean，用于脏检测
+const savedSnapshot = ref(normalizeFormData({ ...props.formData }))
+
+// 字段规范化：按 key 排序拼接，避免对象键序差异造成误判
+function normalizeFormData(obj) {
+  return Object.keys(obj)
+    .sort()
+    .map((k) => `${k}:${obj[k]}`)
+    .join('|')
+}
+
+// 是否存在未保存的修改：画布编辑过，或 formBean 任一字段与最近一次保存不一致，
+// 驱动工具栏保存按钮的提醒标记（类似 VS Code 文件变更后的 tab 圆点）
+const isDirty = computed(() => {
+  if (canvasDirty.value) return true
+  return normalizeFormData(formDataLocal.value) !== savedSnapshot.value
+})
 // 右侧属性面板显示/隐藏状态
 const panelVisible = ref(true)
 // 所有面板是否都已收起（用于切换按钮文案）
@@ -157,8 +171,8 @@ async function initModeler() {
     // 画布上新增/删除了节点时，同步 taskInfo（已有条目的自定义属性保留）
     syncTaskInfo()
     updateCommandState()
-    // 组件内部直接反馈"有改动"，无需冒泡到父组件
-    showToast('已变更，请记得保存')
+    // 标记画布存在编辑，工具栏保存按钮显示提醒标记（不再弹频繁的 toast）
+    canvasDirty.value = true
   })
   updateCommandState()
 
@@ -397,7 +411,11 @@ async function save(extra = {}) {
   try {
     const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
     bpmnXml = xml
-    emit('update:formData', buildFormBean(extra))
+    // 保存成功：清除画布编辑标记，并记录当前完整 formBean 快照用于后续脏检测
+    canvasDirty.value = false
+    const bean = buildFormBean(extra)
+    savedSnapshot.value = normalizeFormData(bean)
+    emit('update:formData', bean)
     emit('saved')
   } catch (err) {
     console.error('保存失败:', err)
@@ -462,6 +480,7 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
       :can-undo="canUndo"
       :can-redo="canRedo"
       :is-saving="isSaving"
+      :is-dirty="isDirty"
       :all-panels-collapsed="allPanelsCollapsed"
       @undo="undo"
       @redo="redo"
