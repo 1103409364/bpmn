@@ -53,6 +53,8 @@ async function initModeler() {
   const { BpmnPropertiesPanelModule } = await import('bpmn-js-properties-panel')
   // Camunda 的 moddle 扩展定义（JSON）：让属性面板能识别并编辑 camunda:* 扩展属性
   const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
+  // 自定义 palette 模块：保留默认工具栏的基础上扩展额外工具
+  const { paletteModule } = await import('./palette/index')
 
   // 创建 modeler 实例：
   modeler = new BpmnModeler({
@@ -63,7 +65,7 @@ async function initModeler() {
       parent: panelRef.value
     },
     // additionalModules: 额外注册的模块，属性面板本身就是一个模块
-    additionalModules: [BpmnPropertiesPanelModule],
+    additionalModules: [BpmnPropertiesPanelModule, paletteModule],
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     moddleExtensions: {
       camunda: camundaModdle
