@@ -281,7 +281,7 @@ function defaultTaskInfoEntry(bo) {
  * - 元素类型被替换（id 相同 $type 变化，如 UserTask → ServiceTask）时重建条目，避免残留重复 id 的旧条目
  */
 function syncTaskInfo() {
-  if (!modeler) return
+  if (!modeler) return parseTaskInfo()
   const nodes = collectFlowNodes()
   const ids = nodes.map(({ bo }) => bo.id)
   // 基于 formData 中的 taskInfo 构建新的数组，避免原地修改导致不一致
@@ -308,7 +308,8 @@ function syncTaskInfo() {
       current.push(defaultTaskInfoEntry(bo))
     }
   })
-  taskInfo.value = current
+
+  return current // 不直接赋给 taskInfo.value，只返回对齐后的纯数组，不触发 v-model:form-data 的 setter，避免重复 emit
 }
 
 /**
@@ -321,16 +322,25 @@ let canvasEditSeq = 0
 async function refreshCanvasState() {
   if (!modeler) return
   const seq = ++canvasEditSeq
-  syncTaskInfo()
+  
+  // A. 获取节点对齐数据
+  const nextTaskInfo = syncTaskInfo()
   updateCommandState()
+
+  // B. 异步生成最新的 BPMN XML
   const { xml } = await modeler.saveXML({ format: true })
   // 丢弃并发编辑时较早的序列化结果，避免旧 XML 覆盖新状态
   if (seq !== canvasEditSeq) return
-  formDataLocal.value = {
+
+  // C. 【一次性合并更新】并发出【唯一一次 emit】
+  const updatedFormData = {
     ...formDataLocal.value,
     bpmn: xml,
-    taskInfo: JSON.stringify(taskInfo.value)
+    taskInfo: JSON.stringify(nextTaskInfo)
   }
+  
+  formDataLocal.value = updatedFormData
+  emit('update:formData', updatedFormData) // 👈 保证了 bpmn 与 taskInfo 数据的绝对同步，且只触发一次
 }
 
 /**
