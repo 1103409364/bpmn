@@ -697,4 +697,5 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 .djs-accordion-palette.djs-palette:not(.open) .djs-accordion-palette-handle {
   display: flex;
 }
+
 </style>

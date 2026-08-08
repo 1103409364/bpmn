@@ -113,4 +113,8 @@ body,
 .fade-leave-to {
   opacity: 0;
 }
+.custom-icon-test {
+  background-image: url('./assets/vite.svg');
+  background-size: 100% 100%;
+}
 </style>
