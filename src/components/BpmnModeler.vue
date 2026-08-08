@@ -55,6 +55,8 @@ async function initModeler() {
   const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
   // 自定义 palette 模块：保留默认工具栏的基础上扩展额外工具
   const { paletteModule } = await import('./palette/index')
+  // 中文本地化模块：覆盖 translate 服务，把默认工具提示翻译成中文
+  const { translateModule } = await import('./i18n/index')
 
   // 创建 modeler 实例：
   modeler = new BpmnModeler({
@@ -65,7 +67,7 @@ async function initModeler() {
       parent: panelRef.value
     },
     // additionalModules: 额外注册的模块，属性面板本身就是一个模块
-    additionalModules: [BpmnPropertiesPanelModule, paletteModule],
+    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule],
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     moddleExtensions: {
       camunda: camundaModdle
