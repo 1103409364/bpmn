@@ -575,6 +575,7 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 }
 
 .bpmn-panel {
+  position: relative;
   width: 320px;
   background: #fff;
   border-left: 1px solid #e5e7eb;

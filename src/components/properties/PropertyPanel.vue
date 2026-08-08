@@ -78,6 +78,11 @@ function updateFormField(key, value) {
 
 <template>
   <div class="panel-root">
+    <button class="panel-toggle" title="收起" @click="emit('close')">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
     <div class="panel-head">
       <div class="panel-head-main">
         <template v-if="entry">
@@ -86,11 +91,6 @@ function updateFormField(key, value) {
         </template>
         <div v-else class="panel-type">基础信息</div>
       </div>
-      <button class="panel-toggle" title="收起" @click="emit('close')">
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
     </div>
     <div class="panel-fields">
       <template v-if="entry">
@@ -119,14 +119,12 @@ function updateFormField(key, value) {
 
 <style scoped>
 .panel-root {
-  padding: 12px 16px;
+  padding: 12px 16px 12px 40px;
 }
 
 .panel-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -136,6 +134,10 @@ function updateFormField(key, value) {
 }
 
 .panel-toggle {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
