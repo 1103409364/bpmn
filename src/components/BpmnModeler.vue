@@ -381,7 +381,8 @@ function buildFormBean(extra = {}) {
 }
 
 /**
- * 保存流程：把画布上的所有改动序列化回 BPMN XML，组装 formBean 并通过 saved 事件抛出
+ * 保存流程：把画布上的所有改动序列化回 BPMN XML，组装 formBean 并通过 v-model:form-data
+ * 同步全部数据（表单元数据 + bpmn + taskInfo），saved 事件仅作为保存完成通知
  * saveXML 是 importXML 的逆操作
  */
 async function save(extra = {}) {
@@ -390,7 +391,8 @@ async function save(extra = {}) {
   try {
     const { xml } = await modeler.saveXML({ format: true }) // format: 格式化缩进
     bpmnXml = xml
-    emit('saved', buildFormBean(extra))
+    emit('update:formData', buildFormBean(extra))
+    emit('saved')
   } catch (err) {
     console.error('保存失败:', err)
   } finally {

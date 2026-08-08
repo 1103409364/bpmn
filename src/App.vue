@@ -6,8 +6,16 @@ import initialXml from './assets/bpmn/initial.bpmn?raw'
 
 // 子组件实例引用：可通过 modelerRef.value.save() 等方式调用组件暴露的方法
 const modelerRef = ref(null)
-// 保存成功后返回的流程 formBean（bpmn + taskInfo + 表单元数据，供数据库落库）
-const savedFormBean = ref(null)
+// 单一数据源：流程表单元数据 + bpmn + taskInfo，供数据库落库。
+// 初始化时 bpmn 取 initialXml，taskInfo 为空数组 JSON；saved 事件后用最新序列化结果整体替换
+const formBean = ref({
+  workflowCode: 'DEMO',
+  workflowName: '请假审批流程',
+  workflowType: 'W',
+  publishedFlag: '1',
+  bpmn: initialXml,
+  taskInfo: '[]'
+})
 // 页面右上角的轻提示文案，空字符串表示不显示
 const toast = ref('')
 
@@ -19,19 +27,10 @@ function showToast(msg) {
   toastTimer = setTimeout(() => (toast.value = ''), 2500)
 }
 
-// 监听子组件 saved 事件：拿到序列化后的 formBean
-function onSaved(formBean) {
-  savedFormBean.value = formBean
+// 监听子组件 saved 事件：保存完成通知（数据已由 v-model:form-data 自动同步）
+function onSaved() {
   showToast('流程保存成功')
 }
-
-// 流程表单元数据：与 bpmn / taskInfo 一起合并进 formBean 落库
-const formData = ref({
-  workflowCode: 'DEMO',
-  workflowName: '请假审批流程',
-  workflowType: 'W',
-  publishedFlag: '1'
-})
 
 // 监听 command-stack-changed：画布内容有改动时提醒用户保存
 function onCommandChanged() {
@@ -43,15 +42,15 @@ function onCommandChanged() {
   <div class="flow-page">
     <BpmnModeler
       ref="modelerRef"
-      :xml="initialXml"
-      :title="formData.workflowName"
-      v-model:form-data="formData"
+      :xml="formBean.bpmn"
+      :title="formBean.workflowName"
+      v-model:form-data="formBean"
       @saved="onSaved"
       @command-stack-changed="onCommandChanged"
     />
-    <div v-if="savedFormBean" class="flow-info">
-      流程 XML: {{ (savedFormBean.bpmn.length / 1024).toFixed(1) }} KB /
-      taskInfo: {{ (savedFormBean.taskInfo.length / 1024).toFixed(1) }} KB
+    <div v-if="formBean.bpmn" class="flow-info">
+      流程 XML: {{ (formBean.bpmn.length / 1024).toFixed(1) }} KB /
+      taskInfo: {{ (formBean.taskInfo.length / 1024).toFixed(1) }} KB
     </div>
     <transition name="fade">
       <div v-if="toast" class="flow-toast">{{ toast }}</div>
