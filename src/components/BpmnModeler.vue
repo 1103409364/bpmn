@@ -448,26 +448,17 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
     </div>
     <div class="bpmn-body">
       <div class="bpmn-canvas" ref="canvasRef"></div>
-      <div class="bpmn-panel" v-show="modelerReady && panelVisible">
-        <PropertyPanel
-          :element="activeElement"
-          :task-info="taskInfo"
-          :form-data="formDataLocal"
-          @change="onTaskInfoChange"
-          @form-change="onFormDataChange"
-          @close="panelVisible = false"
-        />
-      </div>
-      <button
-        v-if="modelerReady && !panelVisible"
-        class="bpmn-panel-expand"
-        title="展开属性"
-        @click="panelVisible = true"
-      >
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
+      <PropertyPanel
+        v-if="modelerReady"
+        :element="activeElement"
+        :task-info="taskInfo"
+        :form-data="formDataLocal"
+        :collapsed="!panelVisible"
+        @change="onTaskInfoChange"
+        @form-change="onFormDataChange"
+        @close="panelVisible = false"
+        @expand="panelVisible = true"
+      />
     </div>
   </div>
 </template>
@@ -572,40 +563,6 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   flex: 1;
   background: #f3f4f6;
   min-width: 0;
-}
-
-.bpmn-panel {
-  position: relative;
-  width: 320px;
-  background: #fff;
-  border-left: 1px solid #e5e7eb;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-.bpmn-panel-expand {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 48px;
-  padding: 0;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
-  color: #374151;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.bpmn-panel-expand:hover {
-  border-color: #10b981;
-  color: #10b981;
 }
 </style>
 
