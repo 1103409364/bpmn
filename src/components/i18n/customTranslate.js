@@ -1,15 +1,5 @@
-import bpmnZh from 'bpmn-js-i18n-zh/lib/bpmn-js'
-import propertiesPanelZh from 'bpmn-js-i18n-zh/lib/properties-panel'
-import camundaPropertiesPanelZh from 'bpmn-js-i18n-zh/lib/camunda-properties-panel'
-
-// 合并 bpmn-js、属性面板、Camunda 属性面板的中文翻译资源。
-// bpmn-js 通过注入的 translate 服务取文案，这里用自定义模块覆盖默认 translate，
-// 未命中的 key 原样返回并照常做 {key} 占位符替换。
+// 仅使用本地自定义翻译覆盖，否则原文不再替换。
 const zhCN = {
-  ...bpmnZh,
-  ...propertiesPanelZh,
-  ...camundaPropertiesPanelZh,
-
   // 对第三方资源不满意或缺失的文案，可在此处直接覆盖对应 key
   'Create expanded sub-process': '创建展开子流程',
   'Create pool/participant': '创建泳道/参与者',

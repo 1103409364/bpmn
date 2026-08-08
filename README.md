@@ -13,6 +13,16 @@
 - [bpmn-js-i18n-zh](https://github.com/miyuesc/bpmn-js-i18n-zh) bpmn-js 中文本地化资源
 - [diagram-js-grid](https://github.com/bpmn-io/diagram-js-grid) 画布网格显示
 
+## 内网脚本加载适配
+
+如果内网私有仓库无法安装 `bpmn-js` 及其相关 npm 依赖，项目已支持运行时脚本加载：
+
+- 将 `bpmn-js`、`camunda-bpmn-moddle`、`diagram-js-accordion-palette`、`diagram-js-grid`、`bpmn-auto-layout` 等运行时包部署到内网静态目录
+- 通过 `window.__BPMN_SCRIPT_FALLBACK__` 在 `index.html` 中配置样式和脚本路径
+- 组件会优先尝试 npm import，失败时自动使用全局脚本包
+
+示例配置已写入 `index.html`，默认路径为 `/vendor/...`。
+
 ## 快速开始
 
 ```bash

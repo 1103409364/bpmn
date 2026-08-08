@@ -5,6 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>流程引擎 - BPMN 设计器</title>
+    <!--
+      内网私有仓库无法通过 npm 安装 bpmn-js 相关依赖时，
+      可把运行时包部署到内网静态目录（例如 /vendor），并通过 window.__BPMN_SCRIPT_FALLBACK__ 指定路径。
+      若已直接在页面中通过 script 标签引入，也可省略此配置。
+    -->
+    <script>
+      window.__BPMN_SCRIPT_FALLBACK__ = {
+        styles: [
+          '/js/bpmn-js/assets/diagram-js.css',
+          '/js/bpmn-js/assets/bpmn-js.css',
+          '/js/bpmn-js/assets/bpmn-font/css/bpmn-embedded.css',
+          '/js/diagram-js-accordion-palette/assets/index.css'
+        ],
+        scripts: [
+          '/js/bpmn-js/bpmn-modeler.development.js',
+          '/js/diagram-js-accordion-palette/diagram-js-accordion-palette.umd.js'
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

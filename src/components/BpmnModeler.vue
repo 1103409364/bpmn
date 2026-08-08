@@ -1,13 +1,6 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-// bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
-import BpmnModeler from 'bpmn-js/lib/Modeler'
-// 这三个是 bpmn-js 自带的样式：画布基础样式 + BPMN 图形样式 + 字体图标
-import 'bpmn-js/dist/assets/diagram-js.css'
-import 'bpmn-js/dist/assets/bpmn-js.css'
-import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
-// 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
-import 'diagram-js-accordion-palette/assets/index.css'
+import { ensureBpmnEnvironment, getBpmnGlobals, getBpmnAutoLayoutProcess } from '../utils/bpmnScriptLoader.js'
 // 属性编辑器组件：选中元素时编辑节点属性，未选中时编辑流程表单元数据
 import PropertyPanel from './properties/PropertyPanel.vue'
 // 顶部工具栏组件：标题 + 撤销/重做 + 缩放 + 预览 + 下载 + 保存
@@ -64,6 +57,71 @@ let modeler = null
 const modelerReady = ref(false)
 // bpmn-auto-layout 的 layoutProcess：懒加载，首次自动布局时动态 import
 let layoutProcess = null
+
+const dynamicImport = new Function('modulePath', 'return import(modulePath)')
+
+// 模块路径映射器：将包名映射到 /js 目录中的实际文件
+const MODULE_PATH_MAP = {
+  'bpmn-js/lib/Modeler': '/js/bpmn-js/bpmn-modeler.development.js',
+  'camunda-bpmn-moddle/resources/camunda.json': '/js/camunda-bpmn-moddle/camunda.json',
+  'diagram-js-accordion-palette': '/js/diagram-js-accordion-palette/diagram-js-accordion-palette.umd.js',
+  'diagram-js-grid': '/js/diagram-js-grid/index.js',
+  'bpmn-auto-layout': '/js/bpmn-auto-layout/index.js'
+}
+
+function mapModulePath(moduleName) {
+  return MODULE_PATH_MAP[moduleName] || moduleName
+}
+
+async function resolveBpmnModelerClass() {
+  try {
+    const mod = await dynamicImport(mapModulePath('bpmn-js/lib/Modeler'))
+    return mod.default || mod
+  } catch (err) {
+    await ensureBpmnEnvironment()
+    const globals = getBpmnGlobals()
+    return globals.BpmnModelerClass || globals.BpmnJS || globals.BpmnModeler
+  }
+}
+
+async function resolveCamundaModdle() {
+  try {
+    const mod = await fetch(mapModulePath('camunda-bpmn-moddle/resources/camunda.json')).then(r => r.json())
+    return mod
+  } catch (err) {
+    await ensureBpmnEnvironment()
+    const globals = getBpmnGlobals()
+    return globals.camundaModdle || globals.CamundaBpmnModdle || globals.camundaBpmnModdle || null
+  }
+}
+
+async function resolveOptionalModule(packageName, globalNames) {
+  try {
+    const mod = await dynamicImport(mapModulePath(packageName))
+    return mod.default || mod
+  } catch (err) {
+    await ensureBpmnEnvironment()
+    const globals = getBpmnGlobals()
+    for (const name of globalNames) {
+      if (globals[name]) return globals[name]
+      if (typeof window !== 'undefined' && window[name]) return window[name]
+    }
+    return null
+  }
+}
+
+async function ensureBpmnStyles() {
+  try {
+    await Promise.all([
+      dynamicImport('bpmn-js/dist/assets/diagram-js.css'),
+      dynamicImport('bpmn-js/dist/assets/bpmn-js.css'),
+      dynamicImport('bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'),
+      dynamicImport('diagram-js-accordion-palette/assets/index.css')
+    ])
+  } catch (err) {
+    await ensureBpmnEnvironment()
+  }
+}
 
 // 当前选中的元素信息（用于右侧属性面板定位）。
 // 必须用 shallowRef：bpmn-js 元素含非可配置属性（如 labels），深度代理会导致 updateProperties 抛错、节点标签不刷新
@@ -151,19 +209,32 @@ async function applyFormData(newFormData) {
  * 动态 import 两个包：它们体积较大，只在用到时加载，可以减小首屏体积。
  */
 async function initModeler() {
+  const BpmnModelerClass = await resolveBpmnModelerClass()
+  if (!BpmnModelerClass) {
+    throw new Error('无法加载 bpmn-js Modeler，请通过 script 标签或 window.__BPMN_SCRIPT_FALLBACK__ 提供运行时包')
+  }
+
   // Camunda 的 moddle 扩展定义（JSON）：保证解析带 camunda:* 扩展属性的流程 XML
-  const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
+  const camundaModdle = await resolveCamundaModdle()
   // 自定义 palette 模块：保留默认工具栏的基础上扩展额外工具
   const { paletteModule } = await import('./palette/index')
   // 中文本地化模块：覆盖 translate 服务，把默认工具提示翻译成中文
   const { translateModule } = await import('./i18n/index')
   // 手风琴折叠式 palette 模块：替换默认的 palette 服务，按分组折叠/展开
-  const { default: AccordionPaletteModule } = await import('diagram-js-accordion-palette')
+  const AccordionPaletteModule = await resolveOptionalModule('diagram-js-accordion-palette', [
+    'AccordionPaletteModule',
+    'DiagramJsAccordionPalette',
+    'diagramJsAccordionPalette'
+  ])
   // 视觉网格模块：在画布上显示点状网格（SVG 实现，无需引入样式）
-  const { default: gridModule } = await import('diagram-js-grid')
+  const gridModule = await resolveOptionalModule('diagram-js-grid', [
+    'gridModule',
+    'DiagramJsGrid',
+    'diagramJsGrid'
+  ])
 
   // 创建 modeler 实例：
-  modeler = new BpmnModeler({
+  modeler = new BpmnModelerClass({
     // container: 画布挂载到哪个 DOM 元素（bpmn-js 会在此元素内渲染 svg 图形）
     container: canvasRef.value,
     // additionalModules: 额外注册的模块（自定义 palette、手风琴 palette、网格、中文本地化）
@@ -442,8 +513,11 @@ async function autoLayout() {
   try {
     // 懒加载自动布局库（体积较大，只用到时才加载）
     if (!layoutProcess) {
-      const mod = await import('bpmn-auto-layout')
-      layoutProcess = mod.layoutProcess
+      layoutProcess = getBpmnAutoLayoutProcess()
+      if (!layoutProcess) {
+        const mod = await dynamicImport(mapModulePath('bpmn-auto-layout'))
+        layoutProcess = mod.layoutProcess || mod.default?.layoutProcess
+      }
     }
     const { xml } = await modeler.saveXML({ format: true })
     const laidOutXml = await layoutProcess(xml)
@@ -565,6 +639,7 @@ function downloadBlob(blob, filename) {
 // onMounted 后再初始化：确保 canvasRef 对应的 DOM 已经渲染到页面中
 onMounted(async () => {
   await nextTick()
+  await ensureBpmnStyles()
   await initModeler()
 })
 
