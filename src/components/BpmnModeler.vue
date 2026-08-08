@@ -633,7 +633,9 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
   height: 28px;
   margin-bottom: 2px;
 }
-
+.djs-accordion-palette.open {
+  width: 160px;
+}
 .djs-accordion-palette.open .djs-accordion-palette-toolbar {
   display: flex;
 }
@@ -641,6 +643,11 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 .djs-accordion-palette-title {
   font-size: 14px;
   font-weight: 600;
+  color: #374151;
+}
+
+.djs-entry-title {
+  font-size: 13px;
   color: #374151;
 }
 
