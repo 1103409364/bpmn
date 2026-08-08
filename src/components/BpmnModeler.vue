@@ -61,6 +61,8 @@ async function initModeler() {
   const { translateModule } = await import('./i18n/index')
   // 手风琴折叠式 palette 模块：替换默认的 palette 服务，按分组折叠/展开
   const { default: AccordionPaletteModule } = await import('diagram-js-accordion-palette')
+  // 视觉网格模块：在画布上显示点状网格（SVG 实现，无需引入样式）
+  const { default: gridModule } = await import('diagram-js-grid')
 
   // 创建 modeler 实例：
   modeler = new BpmnModeler({
@@ -71,7 +73,7 @@ async function initModeler() {
       parent: panelRef.value
     },
     // additionalModules: 额外注册的模块，属性面板本身就是一个模块
-    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule, AccordionPaletteModule],
+    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule, AccordionPaletteModule, gridModule],
     // accordionPalette: 手风琴 palette 的配置
     accordionPalette: {
       showName: false, // 显示工具名称
