@@ -1,7 +1,6 @@
 <script setup>
 import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-// bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。
-// 内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
+// bpmn-js 的核心 Modeler 类：同时具备"查看"(Viewer)和"编辑"(建模)能力。内部是依赖注入(IoC)架构，所有功能都以 "service" 形式注册，可用 modeler.get('xxx') 获取。
 import BpmnModeler from 'bpmn-js/lib/Modeler'
 // 这三个是 bpmn-js 自带的样式：画布基础样式 + BPMN 图形样式 + 字体图标
 import 'bpmn-js/dist/assets/diagram-js.css'
@@ -33,15 +32,31 @@ const canvasRef = ref(null)
 // 本地 formData 副本：右侧基础信息编辑器直接修改它，改动后同步回父组件
 const formDataLocal = ref({ ...props.formData })
 
-// v-model 透传桥：setter 里既更新本地副本又 emit 给父组件（App），
-// 使 PropertyPanel 的 v-model:form-data 改动一路同步到最外层
+// v-model 透传桥：setter 里既更新本地副本又 emit 给父组件，使 PropertyPanel 的 v-model:form-data 改动一路同步到最外层
 const formDataModel = computed({
   get: () => formDataLocal.value,
-  set: (val) => {
-    formDataLocal.value = val
-    emit('update:formData', val)
-  }
+  set: (val) => updateFormDataLocal(val)
 })
+
+// 数据类型转换 (JSON <-> Array)
+const taskInfo = computed({
+  get: () => parseTaskInfo(),
+  set: (arr) => updateFormDataLocal({ taskInfo: JSON.stringify(arr) })
+})
+
+function parseTaskInfo() {
+  try {
+    return JSON.parse(formDataLocal.value.taskInfo || '[]')
+  } catch (e) {
+    return []
+  }
+}
+
+// 统一写操作函数（单一收口点）
+function updateFormDataLocal(patch) {
+  formDataLocal.value = { ...formDataLocal.value, ...patch }
+  emit('update:formData', formDataLocal.value)
+}
 
 // modeler 实例必须在 DOM 挂载后才创建，所以不能用 ref 包裹，用普通变量存即可
 let modeler = null
@@ -53,26 +68,6 @@ let layoutProcess = null
 // 当前选中的元素信息（用于右侧属性面板定位）。
 // 必须用 shallowRef：bpmn-js 元素含非可配置属性（如 labels），深度代理会导致 updateProperties 抛错、节点标签不刷新
 const activeElement = shallowRef(null)
-
-// 流程节点属性数据（唯一数据源）：存储在 formDataLocal.bpmn 的 `taskInfo` 字段（JSON 字符串）
-// 用 computed 映射到数组，读写都通过 formDataLocal 保持单一数据源
-function parseTaskInfo() {
-  try {
-    return JSON.parse(formDataLocal.value.taskInfo || '[]')
-  } catch (e) {
-    return []
-  }
-}
-
-const taskInfo = computed({
-  get() {
-    return parseTaskInfo()
-  },
-  set(arr) {
-    formDataLocal.value = { ...formDataLocal.value, taskInfo: JSON.stringify(arr) }
-    emit('update:formData', formDataLocal.value)
-  }
-})
 
 // 撤销/重做按钮是否可用
 const canUndo = ref(false)
