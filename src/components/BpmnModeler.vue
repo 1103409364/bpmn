@@ -9,6 +9,8 @@ import 'bpmn-js/dist/assets/bpmn-js.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
 // ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理）
 import initialXml from '../assets/bpmn/initial.bpmn?raw'
+// 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
+import 'diagram-js-accordion-palette/assets/index.css'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -57,6 +59,8 @@ async function initModeler() {
   const { paletteModule } = await import('./palette/index')
   // 中文本地化模块：覆盖 translate 服务，把默认工具提示翻译成中文
   const { translateModule } = await import('./i18n/index')
+  // 手风琴折叠式 palette 模块：替换默认的 palette 服务，按分组折叠/展开
+  const { default: AccordionPaletteModule } = await import('diagram-js-accordion-palette')
 
   // 创建 modeler 实例：
   modeler = new BpmnModeler({
@@ -67,7 +71,13 @@ async function initModeler() {
       parent: panelRef.value
     },
     // additionalModules: 额外注册的模块，属性面板本身就是一个模块
-    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule],
+    additionalModules: [BpmnPropertiesPanelModule, paletteModule, translateModule, AccordionPaletteModule],
+    // accordionPalette: 手风琴 palette 的配置
+    accordionPalette: {
+      showName: false, // 显示工具名称
+      accordion: false, // 关闭手风琴模式，允许多个分组同时展开
+      defaultOpenGroups: ['tools', 'event', 'gateway', 'activity', 'custom'] // 默认展开的分组
+    },
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     moddleExtensions: {
       camunda: camundaModdle

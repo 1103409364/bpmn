@@ -55,13 +55,8 @@ CustomPaletteProvider.prototype.getPaletteEntries = function () {
   }
 
   return {
-    // 分隔线 + 自定义分组：所有自定义条目统一放到新分组 'custom' 里。
-    // Palette 渲染时按条目首次出现顺序创建分组容器，该分组在所有默认分组之后创建，
-    // 因此会整体渲染在默认 palette 下方、横线之下。
-    'custom-separator': {
-      group: 'custom',
-      separator: true
-    },
+    // 所有自定义条目统一放到新分组 'custom' 里（手风琴 palette 会按分组折叠展示，
+    // 该分组在默认分组之后创建，因此渲染在 palette 底部）。
 
     // 常用任务类型快捷入口（默认 palette 只有通用 Task）
     'create.user-task': createAction('bpmn:UserTask', 'custom', 'bpmn-icon-user-task', translate('创建用户任务')),
