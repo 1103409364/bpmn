@@ -70,6 +70,8 @@ let modeler = null
 const modelerReady = ref(false)
 // 保存后的流程 XML 字符串
 let bpmnXml = ''
+// bpmn-auto-layout 的 layoutProcess：懒加载，首次自动布局时动态 import
+let layoutProcess = null
 
 // 当前选中的元素信息（用于右侧属性面板定位）
 const activeElement = ref(null)
@@ -337,6 +339,33 @@ function redo() {
   modeler.get('commandStack').redo()
 }
 
+/**
+ * 自动布局：利用 bpmn-auto-layout 对流程 XML 重新排版，再重新导入画布。
+ * - 先把画布当前状态序列化为 XML
+ * - layoutProcess 会整体重算所有节点/连线的坐标（元素 id 与扩展属性均保留）
+ * - 重新导入后同步 taskInfo（按 id 匹配，自定义属性不丢失），并自适应缩放
+ */
+async function autoLayout() {
+  if (!modeler) return
+  try {
+    // 懒加载自动布局库（体积较大，只用到时才加载）
+    if (!layoutProcess) {
+      const mod = await import('bpmn-auto-layout')
+      layoutProcess = mod.layoutProcess
+    }
+    const { xml } = await modeler.saveXML({ format: true })
+    const laidOutXml = await layoutProcess(xml)
+    await modeler.importXML(laidOutXml)
+    // 重新导入会重建元素实例，taskInfo 需按 id 重新对齐（自定义属性保留）
+    syncTaskInfo()
+    const canvas = modeler.get('canvas')
+    canvas.resized()
+    canvas.zoom('fit-viewport', 'auto')
+  } catch (err) {
+    console.error('自动布局失败:', err)
+  }
+}
+
 // 一键收起/展开所有面板（左侧工具栏 + 右侧属性面板）
 function toggleAllPanels() {
   const palette = modeler.get('palette')
@@ -469,7 +498,7 @@ onBeforeUnmount(() => {
 })
 
 // 暴露给父组件调用的方法
-defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
+defineExpose({ save, download, getXml, getFormBean, undo, redo, autoLayout, taskInfo })
 </script>
 
 <template>
@@ -484,6 +513,7 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
       :all-panels-collapsed="allPanelsCollapsed"
       @undo="undo"
       @redo="redo"
+      @layout="autoLayout"
       @zoom-out="zoomOut"
       @zoom-in="zoomIn"
       @reset-zoom="resetZoom"

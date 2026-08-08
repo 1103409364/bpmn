@@ -38,7 +38,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', 'toggle-panels', 'download', 'save'])
+const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'reset-zoom', 'toggle-panels', 'download', 'save'])
 </script>
 
 <template>
@@ -64,6 +64,16 @@ const emit = defineEmits(['undo', 'redo', 'zoom-out', 'zoom-in', 'reset-zoom', '
             <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <span>重做</span>
+        </button>
+        <span class="bpmn-divider"></span>
+        <button class="bpmn-btn" @click="emit('layout')" title="自动布局">
+          <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="14" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+            <rect x="14" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>自动布局</span>
         </button>
         <span class="bpmn-divider"></span>
         <button class="bpmn-btn bpmn-btn-icon" @click="emit('zoom-out')" title="缩小">
