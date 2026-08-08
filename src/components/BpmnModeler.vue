@@ -98,7 +98,7 @@ async function initModeler() {
     accordionPalette: {
       showName: false, // 显示工具名称
       accordion: false, // 关闭手风琴模式，允许多个分组同时展开
-      defaultOpenGroups: ['tools', 'event', 'gateway', 'activity', 'custom'] // 默认展开的分组
+      defaultOpenGroups: ['default', 'custom'] // 默认展开的分组
     },
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     moddleExtensions: {

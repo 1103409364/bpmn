@@ -15,6 +15,7 @@ const zhCN = {
   'Create pool/participant': '创建泳道/参与者',
 
   // 手风琴 palette 的分组名称（summary 通过 translate(entry.group) 渲染）
+  'default': '默认',
   'tools': '工具',
   'event': '事件',
   'gateway': '网关',
