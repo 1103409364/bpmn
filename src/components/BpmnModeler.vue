@@ -633,9 +633,14 @@ defineExpose({ save, download, getXml, getFormBean, undo, redo, taskInfo })
 }
 
 .djs-accordion-palette-title {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #374151;
+}
+
+/* 折叠面板分组标题（事件/网关/活动等） */
+.djs-accordion-palette .djs-accordion-group summary {
+  font-size: 14px;
 }
 
 .djs-accordion-palette-collapse {
