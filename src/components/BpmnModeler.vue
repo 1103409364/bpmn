@@ -152,7 +152,7 @@ async function applyFormData(newFormData) {
  */
 async function initModeler() {
   // Camunda 的 moddle 扩展定义（JSON）：保证解析带 camunda:* 扩展属性的流程 XML
-  const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
+  // const { default: camundaModdle } = await import('camunda-bpmn-moddle/resources/camunda.json')
   // 自定义 palette 模块：保留默认工具栏的基础上扩展额外工具
   const { paletteModule } = await import('./palette/index')
   // 中文本地化模块：覆盖 translate 服务，把默认工具提示翻译成中文
@@ -175,9 +175,9 @@ async function initModeler() {
       defaultOpenGroups: ['default', 'custom'] // 默认展开的分组
     },
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
-    moddleExtensions: {
-      camunda: camundaModdle
-    }
+    // moddleExtensions: {
+    //   camunda: camundaModdle
+    // }
   })
 
   // 统一加载初始数据并自适应视口
