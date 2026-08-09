@@ -64,6 +64,7 @@ bpmn/
 | 未保存提醒 | 工具栏保存按钮显示脏标记圆点，提示存在未保存的修改（详见"未保存修改检测"一节） |
 | 选中联动 | 显示当前选中元素的 id、类型、属性 |
 | 网格显示 | 画布上的点状网格，便于元素对齐 |
+| 只读预览 | 一键切换到只读预览，画布不可编辑（详见"只读预览"一节） |
 
 **Props：**
 
@@ -227,6 +228,26 @@ bpmn/
 - 脏检测与快照：`BpmnModeler.vue` 顶部 `savedSnapshot` / `sameState` / `normalizeBpmn` / `isDirty`
 - 实时状态刷新：`BpmnModeler.vue` 中 `refreshCanvasState()`（`commandStack.changed`、初始化、`autoLayout()` 后调用）
 - 圆点展示：`ModelerToolbar.vue` 的 `:is-dirty` prop 与 `.bpmn-btn-dirty-dot` 样式
+
+## 只读预览
+
+工具栏的「预览」按钮用于把流程切换到**只读预览模式**，与「收起面板」这类纯视图操作不同，预览模式真正禁止一切编辑。
+
+### 实现原理
+
+预览模式在画布上覆盖一层 bpmn-js 的 `NavigatedViewer`（`bpmn-js/lib/NavigatedViewer`）：
+
+- `NavigatedViewer` 只注册渲染与导航服务，**不注册** palette、contextPad、modeling、editorActions 等编辑服务，因此元素无法拖动、无法增删改、无法连线，天然满足「不可编辑」
+- 内置 `movecanvas` / `zoomscroll` / `keyboard-move` 导航模块：支持**鼠标拖动画布平移**与滚轮缩放（纯 `Viewer` 只能通过空格键平移）
+- 进入预览前先用 `modeler.saveXML()` 序列化当前画布最新 XML，保证预览内容与编辑态实时一致
+- 覆盖层遮住左侧 palette 与网格；右侧属性面板**保持显示但置为只读**（输入框禁用，仅可查看），点击预览层节点时面板同步展示对应节点属性
+- 预览模式下工具栏的撤销/重做、自动布局、保存按钮被禁用；缩放/适应按钮仍可用（作用于 Viewer）
+- 退出预览时销毁 Viewer 覆盖层，属性面板恢复可编辑状态
+
+### 代码位置
+
+- `BpmnModeler.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()` / `getActiveCanvas()`，覆盖层样式 `.bpmn-preview-container`
+- `ModelerToolbar.vue`：`is-preview` prop、预览按钮高亮与「退出预览」文案、预览模式下禁用编辑类按钮
 
 ## 示例流程
 

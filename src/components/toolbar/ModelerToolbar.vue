@@ -31,14 +31,14 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  // 所有面板是否已收起（用于预览按钮的高亮与提示）
-  allPanelsCollapsed: {
+  // 是否处于只读预览模式：禁用编辑类按钮，预览按钮高亮并切换为"退出预览"
+  isPreview: {
     type: Boolean,
     default: false
   }
 })
 
-const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'reset-zoom', 'toggle-panels', 'download', 'save'])
+const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'reset-zoom', 'preview', 'download', 'save'])
 </script>
 
 <template>
@@ -51,14 +51,14 @@ const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'rese
     </div>
     <div class="bpmn-header-right">
       <template v-if="modelerReady">
-        <button class="bpmn-btn" :disabled="!canUndo" @click="emit('undo')" title="撤销">
+        <button class="bpmn-btn" :disabled="!canUndo || isPreview" @click="emit('undo')" title="撤销">
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 7v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <span>撤销</span>
         </button>
-        <button class="bpmn-btn" :disabled="!canRedo" @click="emit('redo')" title="重做">
+        <button class="bpmn-btn" :disabled="!canRedo || isPreview" @click="emit('redo')" title="重做">
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M21 7v6h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -66,7 +66,7 @@ const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'rese
           <span>重做</span>
         </button>
         <span class="bpmn-divider"></span>
-        <button class="bpmn-btn" @click="emit('layout')" title="自动布局">
+        <button class="bpmn-btn" :disabled="isPreview" @click="emit('layout')" title="自动布局">
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
             <rect x="14" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -103,15 +103,15 @@ const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'rese
         <span class="bpmn-divider"></span>
         <button
           class="bpmn-btn"
-          :class="{ 'bpmn-btn-active': allPanelsCollapsed }"
-          @click="emit('toggle-panels')"
-          :title="allPanelsCollapsed ? '退出预览' : '收起面板，预览流程'"
+          :class="{ 'bpmn-btn-active': isPreview }"
+          @click="emit('preview')"
+          :title="isPreview ? '退出预览，恢复编辑' : '进入只读预览'"
         >
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
           </svg>
-          <span>预览</span>
+          <span>{{ isPreview ? '退出预览' : '预览' }}</span>
         </button>
         <span class="bpmn-divider"></span>
         <button class="bpmn-btn" @click="emit('download', 'svg')">
@@ -132,9 +132,9 @@ const emit = defineEmits(['undo', 'redo', 'layout', 'zoom-out', 'zoom-in', 'rese
         </button>
         <button
           class="bpmn-btn bpmn-btn-primary bpmn-btn-save"
-          :disabled="isSaving"
+          :disabled="isSaving || isPreview"
           @click="emit('save')"
-          :title="isDirty ? '有未保存的修改' : '保存'"
+          :title="isPreview ? '预览模式不可保存' : (isDirty ? '有未保存的修改' : '保存')"
         >
           <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

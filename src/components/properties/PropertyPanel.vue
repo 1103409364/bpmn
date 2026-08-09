@@ -24,6 +24,11 @@ const props = defineProps({
   collapsed: {
     type: Boolean,
     default: false
+  },
+  // 是否只读：预览模式下画布不可编辑，输入框禁用（仍可查看属性值）
+  readonly: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -111,7 +116,9 @@ function updateFormField(key, value) {
                 <label class="panel-label">{{ field.label }}</label>
                 <input
                   class="panel-input"
+                  :class="{ 'panel-input-disabled': readonly }"
                   :value="entry[field.key] ?? ''"
+                  :disabled="readonly"
                   @input="updateField(field.key, $event.target.value)"
                 />
               </div>
@@ -121,7 +128,9 @@ function updateFormField(key, value) {
                 <label class="panel-label">{{ field.label }}</label>
                 <input
                   class="panel-input"
+                  :class="{ 'panel-input-disabled': readonly }"
                   :value="formData[field.key] ?? ''"
+                  :disabled="readonly"
                   @input="updateFormField(field.key, $event.target.value)"
                 />
               </div>
@@ -144,7 +153,8 @@ function updateFormField(key, value) {
   background: #fff;
   border-left: 1px solid #e5e7eb;
   box-shadow: -4px 0 16px rgba(0, 0, 0, 0.08);
-  z-index: 50;
+  /* 需高于预览覆盖层（.bpmn-preview-container z-index: 60），保证预览模式下面板仍可见 */
+  z-index: 100;
 }
 
 .bpmn-panel.collapsed {
@@ -259,5 +269,18 @@ function updateFormField(key, value) {
 .panel-input:focus {
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+/* 只读（预览模式）下的输入框：禁用态样式 */
+.panel-input-disabled,
+.panel-input:disabled {
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.panel-input:disabled:focus {
+  border-color: #d1d5db;
+  box-shadow: none;
 }
 </style>
