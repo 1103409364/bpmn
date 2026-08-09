@@ -1,25 +1,25 @@
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 1. 指定你需要离线化的顶层主依赖列表
 const targetPackageNames = [
-  'bpmn-auto-layout',
-  'bpmn-js',
-  'bpmn-js-i18n-zh',
-  'diagram-js-accordion-palette',
-  'diagram-js-grid'
+  "bpmn-auto-layout",
+  "bpmn-js",
+  "bpmn-js-i18n-zh",
+  "diagram-js-accordion-palette",
+  "diagram-js-grid",
 ];
 
-const lockFilePath = path.join(__dirname, 'package-lock.json');
-const outputDir = path.join(__dirname, 'pkgs');
+const lockFilePath = path.join(__dirname, "package-lock.json");
+const outputDir = path.join(__dirname, "pkgs");
 
 if (!fs.existsSync(lockFilePath)) {
-  console.error('❌ 未找到 package-lock.json，请先在联网环境运行 npm install');
+  console.error("❌ 未找到 package-lock.json，请先在联网环境运行 npm install");
   process.exit(1);
 }
 
@@ -27,7 +27,7 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-const lockData = JSON.parse(fs.readFileSync(lockFilePath, 'utf8'));
+const lockData = JSON.parse(fs.readFileSync(lockFilePath, "utf8"));
 const packages = lockData.packages || {};
 
 // 2. 存储所有分析出来的依赖包（存入 Set 避免重复）
@@ -50,7 +50,7 @@ function collectDependencies(initialTargets) {
       if (!pkgPath) return; // 跳过根节点 ""
 
       // 提取物理节点对应的真实包名
-      const parts = pkgPath.split('node_modules/').filter(Boolean);
+      const parts = pkgPath.split("node_modules/").filter(Boolean);
       const realPkgName = parts[parts.length - 1];
 
       // 如果当前物理节点匹配正在处理的包名
@@ -58,11 +58,11 @@ function collectDependencies(initialTargets) {
         // 读取其声明的所有直接子依赖
         const subDeps = {
           ...pkgNode.dependencies,
-          ...pkgNode.requires
+          ...pkgNode.requires,
         };
 
         // 将所有子依赖的包名加入待处理队列，实现无限层级追溯
-        Object.keys(subDeps).forEach(subDepName => {
+        Object.keys(subDeps).forEach((subDepName) => {
           if (!visited.has(subDepName)) {
             queue.push(subDepName);
           }
@@ -72,20 +72,26 @@ function collectDependencies(initialTargets) {
   }
 }
 
-console.log('🔍 开始从 package-lock.json 递归分析依赖树...');
+console.log("🔍 开始从 package-lock.json 递归分析依赖树...");
 collectDependencies(targetPackageNames);
 
-console.log(`\n✅ 依赖分析完毕！共检索出 ${allCollectedPackages.size} 个相关依赖包：`);
-console.log(Array.from(allCollectedPackages).map(p => `   - ${p}`).join('\n'));
+console.log(
+  `\n✅ 依赖分析完毕！共检索出 ${allCollectedPackages.size} 个相关依赖包：`,
+);
+console.log(
+  Array.from(allCollectedPackages)
+    .map((p) => `   - ${p}`)
+    .join("\n"),
+);
 
 // 4. 执行 npm pack 打包下载
-console.log('\n🚀 开始下载并打包所有依赖至 ./pkgs 目录...\n');
+console.log("\n🚀 开始下载并打包所有依赖至 ./pkgs 目录...\n");
 let successCount = 0;
 
-allCollectedPackages.forEach(pkgName => {
+allCollectedPackages.forEach((pkgName) => {
   try {
     console.log(`  📦 打包: ${pkgName}`);
-    execSync(`npm pack ${pkgName}`, { cwd: outputDir, stdio: 'ignore' });
+    execSync(`npm pack ${pkgName}`, { cwd: outputDir, stdio: "ignore" });
     successCount++;
   } catch (err) {
     console.error(`  ⚠️ 打包失败: ${pkgName}`);
