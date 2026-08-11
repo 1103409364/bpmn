@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, shallowRef, onMounted } from 'vue'
 import BpmnModeler from './components/BpmnModeler.vue'
 import { useToast } from './composables/useToast.js'
 // ?raw 表示 Vite 把 .bpmn 文件当纯文本字符串导入（不经过打包处理） 把示例流程 XML 以纯文本导入，作为设计器初始内容
@@ -10,7 +10,7 @@ import testXml from './assets/bpmn/initial.bpmn?raw'
 const modelerRef = ref(null)
 
 // 单一数据源：流程表单元数据 + bpmn + taskInfo，供数据库落库。 saved 事件后用最新序列化结果整体替换
-const formBean = ref({
+const formBean = shallowRef({
   workflowCode: 'DEMO',
   workflowName: '请假审批流程',
   workflowType: 'W',
