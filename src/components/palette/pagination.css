@@ -1,5 +1,5 @@
-/* 自定义元素分组的分页条样式（覆盖库对 .entry 的 46x46 图标默认样式） */
-.djs-accordion-palette .djs-custom-elements-pager.entry {
+/* 自定义元素的分页条样式（浮动在分组区底部，独立于 accordion 分组） */
+.djs-accordion-palette .djs-custom-elements-pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -48,8 +48,50 @@
   user-select: none;
 }
 
-/* 搜索框样式（整条宽，覆盖 .entry 的 46x46 图标默认样式） */
-.djs-accordion-palette .djs-custom-elements-search.entry {
+/* 状态提示消息（加载中 / 首载失败重试 / 空结果），浮动在搜索框与分组之间 */
+.djs-accordion-palette .djs-custom-elements-status {
+  width: 100%;
+  margin: 0;
+  padding: 12px 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.djs-accordion-palette .djs-custom-elements-status-loading {
+  color: #6b7280;
+}
+
+.djs-accordion-palette .djs-custom-elements-status-empty {
+  margin: 6px;
+  width: calc(100% - 12px);
+  padding: 16px 8px;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  color: #9ca3af;
+}
+
+.djs-accordion-palette .djs-custom-elements-status-retry {
+  margin: 6px;
+  width: calc(100% - 12px);
+  padding: 12px 8px;
+  border: 1px dashed #f59e0b;
+  border-radius: 6px;
+  color: #b45309;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.djs-accordion-palette .djs-custom-elements-status-retry:hover {
+  background-color: #fffbeb;
+  border-color: #d97706;
+}
+
+/* 搜索框样式（浮动在分组区顶部，独立于 accordion 分组） */
+.djs-accordion-palette .djs-custom-elements-search {
   display: block;
   width: 100%;
   height: auto;

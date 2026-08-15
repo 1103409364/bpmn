@@ -43,8 +43,12 @@ const TYPE_ICON_MAP = {
  * 方案说明：
  * - 保留 diagram-js-accordion-palette 不动，这里只是再注册一个 provider。
  * - 后端元素数据通过 CustomElementsStore 全局分页拉取，getPaletteEntries() 每次
- *   只返回【当前页】的条目 + 一条"分页条"（自定义 entry.html）。
- * - 当前页元素按 item.group 归类到不同 palette 分组；分页条放在最后一个含元素的分组末尾。
+ *   只返回【当前页】的元素条目；元素按 item.group 归类到不同 palette 分组。
+ * - 搜索框、状态提示（加载中/首载失败重试/空结果）、分页条都是【独立于分组】的
+ *   浮动元素（不放进任何 <details> 分组，因此不会随分组一起被收起）：搜索框固定在
+ *   分组区顶部、加载中/失败提示在搜索框与分组之间、空结果提示在面板最底部且位于
+ *   分页条上方、分页条固定在面板最底部，由 _injectFloating() 在每次 _update()
+ *   重建后重新注入。
  * - 点分页条按钮 -> store.prev()/next() 拉取新页 -> 调 palette._rebuild() 重渲染。
  *   _rebuild() 是库内部统一的刷新入口（内部已做未初始化时的空安全保护）。
  *
@@ -62,6 +66,17 @@ export default function CustomElementsProvider(palette, create, elementFactory, 
 
   this._groupName = (config && config.groupName) || '自定义元素'
   this._store = new CustomElementsStore(config || {})
+
+  // 库的 _update() 每次都会清空并重建 .djs-palette-entries 内容，
+  // 搜索框/分页条是独立于分组的浮动元素，需要在每次重建后重新注入。
+  // 这里包一层 _update()，保证 i18n.changed / toggleState 等触发重建时也能保持。
+  const originalUpdate = palette._update.bind(palette)
+  const self = this
+  palette._update = function () {
+    const result = originalUpdate()
+    self._injectFloating()
+    return result
+  }
 
   palette.registerProvider(this)
 
@@ -83,43 +98,9 @@ CustomElementsProvider.prototype.getPaletteEntries = function () {
   const store = this._store
   const entries = {}
 
-  if (!store.initialized && !store.error) {
-    // 首次加载中
-    this._bindSearchInput()
-    entries['custom-elements.loading'] = {
-      group: this._groupName,
-      className: 'bpmn-icon-service-task',
-      title: this._translate('加载中...'),
-      action: {}
-    }
-    return entries
-  }
-
-  if (!store.initialized && store.error) {
-    // 首次加载失败：显示重试
-    entries['custom-elements.retry'] = {
-      group: this._groupName,
-      className: 'bpmn-icon-service-task',
-      title: this._translate('加载失败，点击重试'),
-      action: {
-        click: () => this._loadAndRefresh(1)
-      }
-    }
-    return entries
-  }
-
-  // 已初始化：搜索框常驻（无论有无数据 / 是否加载中）
-  this._bindSearchInput()
-  entries['custom-elements.search'] = this._searchEntry()
-
-  if (!store.items.length) {
-    // 有数据但当前结果为空：区分「搜索无匹配」和「本来就没数据」
-    entries['custom-elements.empty'] = {
-      group: this._groupName,
-      className: 'bpmn-icon-service-task',
-      title: this._translate(store.searching ? '无匹配元素' : '暂无自定义元素'),
-      action: {}
-    }
+  // 加载中 / 首载失败 / 空结果等状态提示由 _injectFloating() 渲染为浮动消息条
+  // （更清晰可见，且不产生空分组）；这里只输出真实数据条目。
+  if (!store.initialized || !store.items.length) {
     return entries
   }
 
@@ -149,46 +130,110 @@ CustomElementsProvider.prototype.getPaletteEntries = function () {
     })
   })
 
-  // 3. 全局分页条（多于一页才显示）：放在最后一个含元素的分组末尾
-  if (store.totalPages > 1) {
-    const groupNames = Object.keys(grouped)
-    const lastGroup = groupNames[groupNames.length - 1]
-    if (lastGroup) {
-      entries['custom-elements.pager.' + lastGroup] = this._pagerEntry(lastGroup)
-    }
-  }
-
   return entries
 }
 
 /**
- * 分页条条目：整条宽的自定义 html，内含 上一页/页码/下一页。
- * 按钮点击经由库的 click 委托机制进入 action.click，
- * 通过 event.target 判断点的是哪个按钮。
- *
- * @param {string} groupName 分页条所在的分组（最后一个含元素的分组）
+ * 在分组区顶部/底部注入独立于分组的浮动元素：
+ * - 搜索框：entriesContainer 的第一个子元素（所有分组之前）
+ * - 分页条：entriesContainer 的最后一个子元素（所有分组之后，仅多页且有数据时）
+ * 这些元素不带 .entry 类，不参与库的分组渲染，也不会被分组折叠/展开影响。
+ * _update() 每次都会清空 entriesContainer，所以每次重建后都要重新注入。
  */
-CustomElementsProvider.prototype._pagerEntry = function (groupName) {
+CustomElementsProvider.prototype._injectFloating = function () {
+  const palette = this._palette
+  const container = palette && palette._container
+  if (!container) return
+
+  this._bindContainerEvents()
+
+  const entriesContainer = container.querySelector('.djs-palette-entries')
+  if (!entriesContainer) return
+
+  // 移除上一次注入的浮动元素
+  Array.prototype.slice.call(entriesContainer.querySelectorAll('.djs-custom-elements-float')).forEach((el) => {
+    entriesContainer.removeChild(el)
+  })
+
+  const store = this._store
+
+  // 1. 搜索框：固定在所有分组之前（首次数据就绪后常驻）
+  if (store.initialized) {
+    entriesContainer.insertBefore(this._buildSearchEl(), entriesContainer.firstChild)
+  }
+
+  // 2. 加载中 / 首载失败重试：位于搜索框之后、分组之前
+  const status = this._buildStatusEl()
+  if (status && status.getAttribute('data-mode') !== 'empty') {
+    const ref = entriesContainer.querySelector('.djs-accordion-group') || null
+    entriesContainer.insertBefore(status, ref)
+  }
+
+  // 3. 分页条：固定在面板最底部（空结果时也保留，作为底部锚点，
+  //    让空提示能放在它上方）
+  if (store.initialized && !store.error && (store.totalPages > 1 || !store.items.length)) {
+    entriesContainer.appendChild(this._buildPagerEl())
+  }
+
+  // 4. 空结果提示：面板最底部、分页条上方
+  if (status && status.getAttribute('data-mode') === 'empty') {
+    const pager = entriesContainer.querySelector('.djs-custom-elements-pager')
+    entriesContainer.insertBefore(status, pager)
+  }
+}
+
+/**
+ * 状态提示浮动消息：
+ * - 首载加载中 -> 「加载中...」（渲染在搜索框之后、分组之前）
+ * - 首载失败   -> 「加载失败，点击重试」（同上，可点击重试）
+ * - 空结果     -> 「无匹配自定义元素」（搜索中）/「暂无自定义元素」（无数据）
+ *                 （渲染在面板最底部、分页条上方）
+ * 无对应状态时返回 null。
+ */
+CustomElementsProvider.prototype._buildStatusEl = function () {
+  const store = this._store
+  let text = null
+  let mode = null
+
+  if (!store.initialized && !store.error) {
+    text = '加载中...'
+    mode = 'loading'
+  } else if (!store.initialized && store.error) {
+    text = '加载失败，点击重试'
+    mode = 'retry'
+  } else if (!store.items.length) {
+    text = store.searching ? '无匹配自定义元素' : '暂无自定义元素'
+    mode = 'empty'
+  }
+
+  if (!text) return null
+
+  const el = document.createElement('div')
+  el.className = 'djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-' + mode
+  el.setAttribute('data-mode', mode)
+  if (mode === 'retry') {
+    el.setAttribute('data-action', 'retry')
+  }
+  el.textContent = this._translate(text)
+  return el
+}
+
+/**
+ * 分页条浮动元素：整条宽的 div，内含 上一页/页码/下一页。
+ */
+CustomElementsProvider.prototype._buildPagerEl = function () {
   const store = this._store
   const loading = store.loading
 
-  const html =
-    '<div class="entry djs-custom-elements-pager" draggable="false">' +
+  const el = document.createElement('div')
+  el.className = 'djs-custom-elements-float djs-custom-elements-pager'
+  el.innerHTML =
     '<button type="button" class="djs-pager-btn djs-pager-prev" data-dir="prev" ' +
     (store.hasPrev && !loading ? '' : 'disabled') + ' aria-label="上一页">&lsaquo;</button>' +
     '<span class="djs-pager-info">' + store.page + ' / ' + store.totalPages + '</span>' +
     '<button type="button" class="djs-pager-btn djs-pager-next" data-dir="next" ' +
-    (store.hasNext && !loading ? '' : 'disabled') + ' aria-label="下一页">&rsaquo;</button>' +
-    '</div>'
-
-  return {
-    group: groupName,
-    html,
-    title: store.page + ' / ' + store.totalPages,
-    action: {
-      click: (event) => this._onPagerClick(event)
-    }
-  }
+    (store.hasNext && !loading ? '' : 'disabled') + ' aria-label="下一页">&rsaquo;</button>'
+  return el
 }
 
 CustomElementsProvider.prototype._onPagerClick = function (event) {
@@ -264,37 +309,35 @@ CustomElementsProvider.prototype._refreshPalette = function () {
   } catch (err) {
     console.error('[CustomElementsProvider] 刷新 palette 失败:', err)
   }
+
+  // 浮动元素可能被其它原因触发的 _update() 重建影响，这里兜底再注入一次
+  this._injectFloating()
 }
 
 /**
- * 搜索框条目：整条宽的自定义 html，内含一个 text input。
- * 输入事件经由 palette 容器上的委托监听处理（见 _bindSearchInput）。
- * 条目点击本身是无效操作，action 给空对象避免库的 triggerEntry 抛错。
+ * 搜索框浮动元素：整条宽的 div，内含一个 text input。
+ * 输入事件经由 palette 容器上的委托监听处理（见 _bindContainerEvents）。
  */
-CustomElementsProvider.prototype._searchEntry = function () {
+CustomElementsProvider.prototype._buildSearchEl = function () {
   const store = this._store
 
-  const html =
-    '<div class="entry djs-custom-elements-search" draggable="false">' +
+  const el = document.createElement('div')
+  el.className = 'djs-custom-elements-float djs-custom-elements-search'
+  el.innerHTML =
     '<input type="text" class="djs-custom-elements-search-input" ' +
-    'placeholder="搜索名称" value="' + escapeHtml(store.keyword) + '" ' +
-    'autocomplete="off" aria-label="搜索自定义元素">' +
-    '</div>'
-
-  return {
-    group: this._groupName,
-    html,
-    title: this._translate('搜索自定义元素'),
-    action: {}
-  }
+    'placeholder="搜索自定义元素" value="' + escapeHtml(store.keyword) + '" ' +
+    'autocomplete="off" aria-label="搜索自定义元素">'
+  return el
 }
 
 /**
- * 在 palette 容器上绑定搜索框的委托事件（输入防抖 / 回车立即搜索）。
- * _rebuild() 会重建内部 DOM，因此监听挂在持久存在的 palette._container 上，
+ * 在 palette 容器上绑定委托事件（只绑定一次）：
+ * - 搜索框输入：300ms 防抖触发搜索；回车立即搜索
+ * - 分页条按钮点击：进入 _onPagerClick
+ * 浮动元素每次 _update() 都被重建，因此监听挂在持久存在的 palette._container 上，
  * 用 _searchBound 保证只绑定一次。
  */
-CustomElementsProvider.prototype._bindSearchInput = function () {
+CustomElementsProvider.prototype._bindContainerEvents = function () {
   if (this._searchBound) return
   const container = this._palette && this._palette._container
   if (!container) return
@@ -323,6 +366,21 @@ CustomElementsProvider.prototype._bindSearchInput = function () {
       clearTimeout(this._searchTimer)
       this._searchTimer = null
       fire(input.value)
+    }
+  })
+
+  container.addEventListener('click', (event) => {
+    const target = event.target
+    if (!(target && target.closest)) return
+
+    const btn = target.closest('.djs-pager-btn')
+    if (btn && !btn.disabled) {
+      this._onPagerClick(event)
+      return
+    }
+
+    if (target.closest('.djs-custom-elements-status[data-action="retry"]')) {
+      this._loadAndRefresh(1)
     }
   })
 }
