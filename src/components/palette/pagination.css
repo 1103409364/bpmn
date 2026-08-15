@@ -1,0 +1,49 @@
+/* 自定义元素分组的分页条样式（覆盖库对 .entry 的 46x46 图标默认样式） */
+.djs-accordion-palette .djs-custom-elements-pager.entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  height: 32px;
+  line-height: 1;
+  padding: 0 6px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.djs-accordion-palette .djs-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #374151;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.djs-accordion-palette .djs-pager-btn:hover:not(:disabled) {
+  border-color: #10b981;
+  color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.djs-accordion-palette .djs-pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.djs-accordion-palette .djs-pager-info {
+  flex: 1;
+  text-align: center;
+  color: #6b7280;
+  user-select: none;
+}

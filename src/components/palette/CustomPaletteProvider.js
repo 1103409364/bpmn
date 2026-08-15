@@ -126,7 +126,8 @@ CustomPaletteProvider.prototype.getPaletteEntries = function () {
 
   return function (entries) {
     forEach(entries, function (entry) {
-      if (entry && entry.group !== 'custom' && entry.group !== 'default') {
+      // 'custom-elements' 是后端自定义元素分组（由 CustomElementsProvider 管理），保持不动
+      if (entry && entry.group !== 'custom' && entry.group !== 'custom-elements' && entry.group !== 'default') {
         entry.group = 'default'
       }
     })
