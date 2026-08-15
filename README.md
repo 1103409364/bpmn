@@ -122,7 +122,7 @@ bpmn/
 ### 三层数据模型
 
 1. **BPMN XML**：标准 BPMN 2.0 流程定义，包含所有标准元素、属性、条件表达式等
-2. **taskInfo 数组**：内存中的自定义任务属性集合（与元素 id 关联），保存时序列化为 JSON 字符串
+2. **taskInfo 数组**：内存中的自定义任务属性集合（与元素 id 关联），以数组类型随 formData 同步
 3. **formData 对象**：流程表单元数据（workflowCode、workflowName、workflowType、publishedFlag 等）
 
 ### 保存流程
@@ -132,7 +132,7 @@ bpmn/
 ```javascript
 {
   bpmn: "<?xml version='1.0' encoding='UTF-8'?><bpmn2:definitions...>", // 格式化后的 BPMN XML
-  taskInfo: "[{id: 'UserTask_1', progressBarName: '...', executeType: '...'}, ...]", // JSON 字符串
+  taskInfo: [{ id: 'UserTask_1', progressBarName: '...', executeType: '...' }, ...], // 节点属性数组
   workflowCode: "DEMO",
   workflowName: "请假审批流程",
   workflowType: "W",
@@ -183,7 +183,7 @@ bpmn/
 
 2. **name 标准属性回写**：节点名称是标准 BPMN 属性。修改时调用 `modeling.updateProperties(element, { name })`，经 `commandStack` 执行 `element.updateProperties` 命令，`LabelBehavior` 在 `postExecute` 中调用 `modeling.updateLabel` 刷新画布标签，同时该操作进入撤销栈，并随 `saveXML` 写入 BPMN XML。
 
-3. **自定义属性仅存内存**：`progressBarName`、`executeType`、`taskType`、`handleStrategy` 等只存在 taskInfo 数组中，不写入 XML；保存时通过 `JSON.stringify(taskInfo)` 序列化到 formBean.taskInfo。
+3. **自定义属性仅存内存**：`progressBarName`、`executeType`、`taskType`、`handleStrategy` 等只存在 taskInfo 数组中，不写入 XML；taskInfo 以数组形式随 formData 一起返回。
 
 ### 元素增删的自动对齐
 
@@ -463,7 +463,7 @@ import myXml from './assets/bpmn/my-flow.bpmn?raw'
 
 ### Q: 自定义属性保存到哪里？
 
-A: 自定义属性保存在 taskInfo 数组中（内存）并序列化为 JSON 字符串，传回给父组件，由你决定是否上传数据库。标准 BPMN 属性（如元素名称、类型）会同步写入 XML 中。
+A: 自定义属性保存在 taskInfo 数组中（内存），直接以数组形式传回给父组件，由你决定是否上传数据库。标准 BPMN 属性（如元素名称、类型）会同步写入 XML 中。
 
 ### Q: 如何获取保存后的流程数据？
 
@@ -549,7 +549,7 @@ PropertyPanel 输入框用 `:value` + `@input` 绑定，通过 `change` 事件�
 
 ### 6. 保存是"画布 XML"与"内存 taskInfo"两份数据的合并
 
-`saveXML` 只序列化画布状态（含标准属性如 `name`），自定义属性不会出现在 XML 中，由 `JSON.stringify(taskInfo)` 单独序列化进 formBean.taskInfo。两者靠元素 `id` 关联，读取时需按 id 合并。
+`saveXML` 只序列化画布状态（含标准属性如 `name`），自定义属性不会出现在 XML 中，由 taskInfo 数组单独随 formData 返回。两者靠元素 `id` 关联，读取时需按 id 合并。
 
 ### 7. 自定义 palette / i18n 模块要遵循 DI 注入
 

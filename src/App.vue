@@ -16,7 +16,7 @@ const formBean = shallowRef({
   workflowType: 'W',
   publishedFlag: '1',
   bpmn: defaultBpmn,
-  taskInfo: '[]'
+  taskInfo: []
 })
 // 页面右上角的轻提示（渲染在 <Toast /> 中，这里只取触发函数）
 const { showToast } = useToast()
@@ -35,7 +35,7 @@ onMounted(() => {
       workflowType: 'W',
       publishedFlag: '1',
       bpmn: testXml,
-      taskInfo: '[]'
+      taskInfo: []
     }
     // loadFormData 触发 v-model:form-data 的更新，taskInfo 计算属性 set 触发
      modelerRef.value?.loadFormData(asyncData)
@@ -53,7 +53,7 @@ onMounted(() => {
     />
     <div v-if="formBean.bpmn" class="flow-info">
       流程 XML: {{ (formBean.bpmn.length / 1024).toFixed(1) }} KB /
-      taskInfo: {{ (formBean.taskInfo.length / 1024).toFixed(1) }} KB
+      taskInfo: {{ formBean.taskInfo.length }} 项
     </div>
   </div>
 </template>

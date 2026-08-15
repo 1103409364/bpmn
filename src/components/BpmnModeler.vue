@@ -40,18 +40,15 @@ const formDataModel = computed({
   set: (val) => updateFormDataLocal(val)
 })
 
-// 数据类型转换 (JSON <-> Array)
+// 节点属性数据源（数组，唯一数据源）
 const taskInfo = computed({
   get: () => parseTaskInfo(),
-  set: (arr) => updateFormDataLocal({ taskInfo: JSON.stringify(arr) })
+  set: (arr) => updateFormDataLocal({ taskInfo: arr })
 })
 
 function parseTaskInfo() {
-  try {
-    return JSON.parse(formDataLocal.value.taskInfo || '[]')
-  } catch (e) {
-    return []
-  }
+  const raw = formDataLocal.value.taskInfo
+  return Array.isArray(raw) ? raw : []
 }
 
 // 统一写操作函数（单一收口点）
@@ -350,7 +347,7 @@ async function refreshCanvasState() {
   const updatedFormData = {
     ...formDataLocal.value,
     bpmn: xml,
-    taskInfo: JSON.stringify(nextTaskInfo)
+    taskInfo: nextTaskInfo
   }
   
   formDataLocal.value = updatedFormData
@@ -370,8 +367,9 @@ function onTaskInfoChange({ key, value }) {
   const idx = arr.findIndex((t) => t.id === bo.id && t.$type === bo.$type)
   if (idx === -1) return
   const updated = { ...arr[idx], [key]: value }
-  arr[idx] = updated
-  taskInfo.value = arr
+  const next = arr.slice()
+  next[idx] = updated
+  taskInfo.value = next
   if (key === 'name') {
     // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈（其后 commandStack.changed 会刷新实时状态）
     modeler.get('modeling').updateProperties(element, { name: value })
@@ -581,7 +579,7 @@ function resetZoom() {
 
 /**
  * 组装最终落库的 formBean：
- * - taskInfo：节点属性 JSON 字符串（唯一数据源）
+ * - taskInfo：节点属性数组（唯一数据源）
  * - processBarInfo 为进度条信息，默认空数组，由业务侧填充
  */
 // function buildFormBean(extra = {}) {
@@ -596,7 +594,7 @@ function resetZoom() {
 //     newFlag: '',
 //     processBarInfo: [],
 //     ...formDataLocal.value,
-//     taskInfo: JSON.stringify(taskInfo.value),
+//     taskInfo: taskInfo.value,
 //     ...extra // extra 覆盖前面字段
 //   }
 // }
