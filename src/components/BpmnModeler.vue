@@ -173,7 +173,7 @@ async function initModeler() {
     accordionPalette: {
       showName: false, // 显示工具名称
       accordion: false, // 关闭手风琴模式，允许多个分组同时展开
-      defaultOpenGroups: ['default', 'custom', '自定义元素'] // 默认展开的分组
+      defaultOpenGroups: ['自定义元素'] // 默认展开的分组 'default', 'custom',
     },
     // customElements: 自定义元素分页配置（供 CustomElementsProvider 使用）
     customElements: {
@@ -273,7 +273,7 @@ function defaultTaskInfoEntry(bo) {
     $type: bo.$type,
     id: bo.id,
     name: bo.name || '',
-    progressBarName: ''
+    xxx: ''
   }
   if (bo.$type === 'bpmn:UserTask') {
     entry.executeType = ''

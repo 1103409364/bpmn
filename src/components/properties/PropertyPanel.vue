@@ -60,18 +60,18 @@ const BASIC_FIELDS = [
 const TASK_FIELDS = {
   'bpmn:StartEvent': [
     { key: 'name', label: '节点名称' },
-    { key: 'progressBarName', label: '进度条名称' }
+    { key: 'xxx', label: 'xxx字段' }
   ],
   'bpmn:UserTask': [
     { key: 'name', label: '节点名称' },
-    { key: 'progressBarName', label: '进度条名称' },
+    { key: 'xxx', label: 'xxx字段' },
     { key: 'executeType', label: '执行方式' },
     { key: 'taskType', label: '任务类型' },
     { key: 'handleStrategy', label: '处理策略' }
   ],
   'bpmn:EndEvent': [
     { key: 'name', label: '节点名称' },
-    { key: 'progressBarName', label: '进度条名称' }
+    { key: 'xxx', label: 'xxx字段' }
   ]
 }
 

@@ -103,7 +103,7 @@ bpmn/
 右侧属性编辑面板，包含两种编辑模式：
 
 - **未选中元素时**：编辑流程表单元数据（workflowCode、workflowName、workflowType、publishedFlag 等）
-- **选中元素时**：编辑该元素的自定义属性（progressBarName、executeType、taskType、handleStrategy 等）
+- **选中元素时**：编辑该元素的自定义属性（xxx、executeType、taskType、handleStrategy 等）
 
 自定义属性仅保存在内存中（taskInfo 数组），不会写入 BPMN XML；标准 `name` 属性会同步回 businessObject 并随 XML 保存。
 
@@ -132,7 +132,7 @@ bpmn/
 ```javascript
 {
   bpmn: "<?xml version='1.0' encoding='UTF-8'?><bpmn2:definitions...>", // 格式化后的 BPMN XML
-  taskInfo: [{ id: 'UserTask_1', progressBarName: '...', executeType: '...' }, ...], // 节点属性数组
+  taskInfo: [{ id: 'UserTask_1', xxx: '...', executeType: '...' }, ...], // 节点属性数组
   workflowCode: "DEMO",
   workflowName: "请假审批流程",
   workflowType: "W",
@@ -183,7 +183,7 @@ bpmn/
 
 2. **name 标准属性回写**：节点名称是标准 BPMN 属性。修改时调用 `modeling.updateProperties(element, { name })`，经 `commandStack` 执行 `element.updateProperties` 命令，`LabelBehavior` 在 `postExecute` 中调用 `modeling.updateLabel` 刷新画布标签，同时该操作进入撤销栈，并随 `saveXML` 写入 BPMN XML。
 
-3. **自定义属性仅存内存**：`progressBarName`、`executeType`、`taskType`、`handleStrategy` 等只存在 taskInfo 数组中，不写入 XML；taskInfo 以数组形式随 formData 一起返回。
+3. **自定义属性仅存内存**：`xxx`、`executeType`、`taskType`、`handleStrategy` 等只存在 taskInfo 数组中，不写入 XML；taskInfo 以数组形式随 formData 一起返回。
 
 ### 元素增删的自动对齐
 
@@ -222,7 +222,7 @@ bpmn/
 
 4. **初始快照取自实时状态**：组件初始化时先 `await refreshCanvasState()` 再用其结果建立快照，而不是直接用父组件传入的 `props.formData`。否则快照里仍是旧 XML / 空 taskInfo，与实时状态不一致，会误判初始即"脏"或撤销回原状后仍显示脏。
 
-5. **自定义属性也参与脏检测**：修改属性面板的自定义属性（`progressBarName` 等）不触发 `commandStack.changed`，`onTaskInfoChange` 会手动把最新 `taskInfo` 同步进 `formDataLocal`，保证这类改动同样点亮圆点。
+5. **自定义属性也参与脏检测**：修改属性面板的自定义属性（`xxx` 等）不触发 `commandStack.changed`，`onTaskInfoChange` 会手动把最新 `taskInfo` 同步进 `formDataLocal`，保证这类改动同样点亮圆点。
 
 6. **保存清除脏标记**：`save()` 成功后把 `buildFormBean(extra)` 的结果合并进 `formDataLocal` 并重建快照，`isDirty` 立即为 `false`。
 
@@ -352,7 +352,7 @@ function handleSaved(formBean) {
 {
   id: 'UserTask_1',
   name: '提交申请',                    // 标准属性，会同步到 BPMN XML
-  progressBarName: '审批进度',         // 自定义属性
+  xxx: '审批进度',         // 自定义属性
   executeType: 'serial',              // 自定义属性
   taskType: 'user-defined',           // 自定义属性
   handleStrategy: 'auto-approve'      // 自定义属性
@@ -533,7 +533,7 @@ data property on the proxy target but the proxy did not return its actual value
 ### 2. taskInfo 是唯一数据源，不要直接改 businessObject
 
 - 修改 `name` 时必须走 `modeling.updateProperties`，让命令进入撤销栈、刷新标签并写入 XML
-- 自定义属性（`progressBarName`、`executeType` 等）仅存内存，**刷新页面会丢失**，需要持久化时必须在保存后由业务侧将 formBean.taskInfo 落库
+- 自定义属性（`xxx`、`executeType` 等）仅存内存，**刷新页面会丢失**，需要持久化时必须在保存后由业务侧将 formBean.taskInfo 落库
 
 ### 3. 属性面板采用单向数据流
 
