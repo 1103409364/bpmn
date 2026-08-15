@@ -5,7 +5,7 @@ import BpmnModeler from 'bpmn-js/lib/Modeler'
 // 这三个是 bpmn-js 自带的样式：画布基础样式 + BPMN 图形样式 + 字体图标
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-js.css'
-import 'bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css'
+import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css'
 // 手风琴折叠式 palette 的样式（替换默认 palette 后必须引入）
 import 'diagram-js-accordion-palette/assets/index.css'
 // 属性编辑器组件：选中元素时编辑节点属性，未选中时编辑流程表单元数据
