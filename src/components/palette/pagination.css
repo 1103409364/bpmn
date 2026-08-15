@@ -47,3 +47,33 @@
   color: #6b7280;
   user-select: none;
 }
+
+/* 搜索框样式（整条宽，覆盖 .entry 的 46x46 图标默认样式） */
+.djs-accordion-palette .djs-custom-elements-search.entry {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 6px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.djs-accordion-palette .djs-custom-elements-search-input {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #374151;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.djs-accordion-palette .djs-custom-elements-search-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}

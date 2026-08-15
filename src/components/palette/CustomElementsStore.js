@@ -5,9 +5,10 @@
  * 与渲染解耦：只负责数据，不碰 palette / DOM。
  *
  * 约定的后端接口返回结构：
- *   fetchPage({ page, pageSize }) => Promise<{ list: Array, total: number }>
- *   - list：当前页元素数组，元素结构约定为 { id, name, type, iconClass }
+ *   fetchPage({ page, pageSize, keyword }) => Promise<{ list: Array, total: number }>
+ *   - list：当前页元素数组，元素结构约定为 { id, name, type, group?, iconClass?, options? }
  *   - total：总条数（用于计算总页数）
+ *   - keyword：搜索关键字（名称模糊搜索），可为空字符串
  * 若后端字段不同，在调用方做一次适配映射即可。
  */
 export default class CustomElementsStore {
@@ -25,6 +26,12 @@ export default class CustomElementsStore {
     this._loading = false
     this._error = null
     this._initialized = false
+
+    // 搜索关键字；非空时表示处于搜索态
+    this._keyword = ''
+
+    // 请求序号：后发请求未返回时，先发的旧请求结果会被丢弃
+    this._seq = 0
   }
 
   get page() {
@@ -55,6 +62,14 @@ export default class CustomElementsStore {
     return this._initialized
   }
 
+  get keyword() {
+    return this._keyword
+  }
+
+  get searching() {
+    return !!this._keyword
+  }
+
   get totalPages() {
     return Math.max(1, Math.ceil(this._total / this._pageSize))
   }
@@ -68,23 +83,35 @@ export default class CustomElementsStore {
   }
 
   /**
-   * 拉取指定页码的数据（默认第 1 页）。
+   * 按关键字搜索：更新关键字并回到第 1 页拉取。
+   * 传入空字符串表示清除搜索。
+   */
+  async search(keyword) {
+    this._keyword = keyword || ''
+    await this.load(1)
+  }
+
+  /**
+   * 拉取指定页码的数据（默认第 1 页），带上当前关键字。
    * 请求失败时保留旧数据，错误信息可通过 error 读取。
+   * 若拉取期间又发起了新请求，本请求结果会被丢弃（序号校验）。
    */
   async load(page = 1) {
-    if (this._loading) return
+    const seq = ++this._seq
     this._loading = true
     this._error = null
     try {
-      const res = await this._fetchPage({ page, pageSize: this._pageSize })
+      const res = await this._fetchPage({ page, pageSize: this._pageSize, keyword: this._keyword })
+      if (seq !== this._seq) return
       this._page = page
       this._total = Number(res && res.total) || 0
       this._items = (res && res.list) || []
       this._initialized = true
     } catch (err) {
+      if (seq !== this._seq) return
       this._error = err
     } finally {
-      this._loading = false
+      if (seq === this._seq) this._loading = false
     }
   }
 

@@ -28,10 +28,9 @@ const MOCK_NAMES = ['审批', '校验', '通知', '抄送', '归档', '分派', 
 // 模拟元素分布在多个分组（真实后端按各自业务字段返回 group）
 const MOCK_GROUPS = ['基础节点', '业务节点', '审批组件', '集成服务']
 
-function mockFetchCustomElements({ page, pageSize }) {
-  const total = MOCK_TOTAL
-  const start = (page - 1) * pageSize
-  const list = Array.from({ length: total }, (_, i) => {
+function mockFetchCustomElements({ page, pageSize, keyword }) {
+  const kw = String(keyword || '').trim().toLowerCase()
+  const all = Array.from({ length: MOCK_TOTAL }, (_, i) => {
     const type = MOCK_TYPES[i % MOCK_TYPES.length]
     const seq = i + 1
     return {
@@ -40,18 +39,26 @@ function mockFetchCustomElements({ page, pageSize }) {
       type,
       group: MOCK_GROUPS[i % MOCK_GROUPS.length]
     }
-  }).slice(start, start + pageSize)
+  })
 
-  return { list, total }
+  // 名称模糊过滤（模拟后端 keyword 参数）
+  const filtered = kw ? all.filter((it) => it.name.toLowerCase().includes(kw)) : all
+
+  const start = (page - 1) * pageSize
+  return {
+    list: filtered.slice(start, start + pageSize),
+    total: filtered.length
+  }
 }
 
 /**
  * 分页拉取自定义元素。
+ * 参数：{ page, pageSize, keyword }，keyword 为名称模糊搜索关键字（可为空串）。
  * 返回 Promise<{ list, total }>。
  *
  * 真实接入示例（把 mock 换成后端请求，字段不一致时在此处映射）：
  * ```
- * return http.get('/api/custom-elements', { params: { page, pageSize } }).then((res) => {
+ * return http.get('/api/custom-elements', { params: { page, pageSize, keyword } }).then((res) => {
  *   const { records, total } = res.data
  *   return {
  *     list: records.map((r) => ({
@@ -66,6 +73,6 @@ function mockFetchCustomElements({ page, pageSize }) {
  * })
  * ```
  */
-export function fetchCustomElements({ page, pageSize }) {
-  return Promise.resolve(mockFetchCustomElements({ page, pageSize }))
+export function fetchCustomElements({ page, pageSize, keyword }) {
+  return Promise.resolve(mockFetchCustomElements({ page, pageSize, keyword }))
 }

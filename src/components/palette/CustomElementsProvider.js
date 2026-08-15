@@ -3,6 +3,16 @@ import { assign } from 'min-dash'
 import CustomElementsStore from './CustomElementsStore'
 
 // BPMN 元素类型 -> 内置图标类名 的兜底映射（item.iconClass 未提供时使用）
+// HTML 转义（搜索关键字要安全地回填到 input.value）
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 const TYPE_ICON_MAP = {
   'bpmn:Task': 'bpmn-icon-task',
   'bpmn:UserTask': 'bpmn-icon-user-task',
@@ -75,10 +85,12 @@ CustomElementsProvider.prototype.getPaletteEntries = function () {
 
   if (!store.initialized && !store.error) {
     // 首次加载中
+    this._bindSearchInput()
     entries['custom-elements.loading'] = {
       group: this._groupName,
       className: 'bpmn-icon-service-task',
-      title: this._translate('加载中...')
+      title: this._translate('加载中...'),
+      action: {}
     }
     return entries
   }
@@ -96,12 +108,17 @@ CustomElementsProvider.prototype.getPaletteEntries = function () {
     return entries
   }
 
+  // 已初始化：搜索框常驻（无论有无数据 / 是否加载中）
+  this._bindSearchInput()
+  entries['custom-elements.search'] = this._searchEntry()
+
   if (!store.items.length) {
-    // 已初始化但没有数据
+    // 有数据但当前结果为空：区分「搜索无匹配」和「本来就没数据」
     entries['custom-elements.empty'] = {
       group: this._groupName,
       className: 'bpmn-icon-service-task',
-      title: this._translate('暂无自定义元素')
+      title: this._translate(store.searching ? '无匹配元素' : '暂无自定义元素'),
+      action: {}
     }
     return entries
   }
@@ -247,4 +264,95 @@ CustomElementsProvider.prototype._refreshPalette = function () {
   } catch (err) {
     console.error('[CustomElementsProvider] 刷新 palette 失败:', err)
   }
+}
+
+/**
+ * 搜索框条目：整条宽的自定义 html，内含一个 text input。
+ * 输入事件经由 palette 容器上的委托监听处理（见 _bindSearchInput）。
+ * 条目点击本身是无效操作，action 给空对象避免库的 triggerEntry 抛错。
+ */
+CustomElementsProvider.prototype._searchEntry = function () {
+  const store = this._store
+
+  const html =
+    '<div class="entry djs-custom-elements-search" draggable="false">' +
+    '<input type="text" class="djs-custom-elements-search-input" ' +
+    'placeholder="搜索名称" value="' + escapeHtml(store.keyword) + '" ' +
+    'autocomplete="off" aria-label="搜索自定义元素">' +
+    '</div>'
+
+  return {
+    group: this._groupName,
+    html,
+    title: this._translate('搜索自定义元素'),
+    action: {}
+  }
+}
+
+/**
+ * 在 palette 容器上绑定搜索框的委托事件（输入防抖 / 回车立即搜索）。
+ * _rebuild() 会重建内部 DOM，因此监听挂在持久存在的 palette._container 上，
+ * 用 _searchBound 保证只绑定一次。
+ */
+CustomElementsProvider.prototype._bindSearchInput = function () {
+  if (this._searchBound) return
+  const container = this._palette && this._palette._container
+  if (!container) return
+
+  this._searchBound = true
+  this._searchTimer = null
+
+  const fire = (value) => {
+    clearTimeout(this._searchTimer)
+    this._searchTimer = null
+    this._search(value)
+  }
+
+  container.addEventListener('input', (event) => {
+    const input = event.target
+    if (!(input && input.classList && input.classList.contains('djs-custom-elements-search-input'))) return
+    clearTimeout(this._searchTimer)
+    this._searchTimer = setTimeout(() => fire(input.value), 300)
+  })
+
+  container.addEventListener('keydown', (event) => {
+    const input = event.target
+    if (!(input && input.classList && input.classList.contains('djs-custom-elements-search-input'))) return
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      clearTimeout(this._searchTimer)
+      this._searchTimer = null
+      fire(input.value)
+    }
+  })
+}
+
+/**
+ * 触发搜索：更新关键字并回第 1 页拉取，刷新后恢复搜索框焦点与光标位置
+ * （_rebuild() 重建 DOM 会销毁旧输入框并夺走焦点）。
+ */
+CustomElementsProvider.prototype._search = function (keyword) {
+  const store = this._store
+  const normalized = String(keyword == null ? '' : keyword).trim()
+  if (normalized === store.keyword) return
+
+  const container = this._palette && this._palette._container
+  const input = container && container.querySelector('.djs-custom-elements-search-input')
+  const wasFocused = input === document.activeElement
+
+  store.search(normalized).then(() => {
+    this._refreshPalette()
+
+    if (wasFocused && container) {
+      const next = container.querySelector('.djs-custom-elements-search-input')
+      if (next) {
+        next.focus()
+        try {
+          next.setSelectionRange(next.value.length, next.value.length)
+        } catch (err) {
+          // 个别环境不支持 setSelectionRange，忽略
+        }
+      }
+    }
+  })
 }
