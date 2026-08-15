@@ -41,7 +41,12 @@ bpmn/
         │   └── PropertyPanel.vue   # 元素属性编辑面板
         ├── palette/
         │   ├── index.js           # 自定义 palette 模块（DI 定义）
-        │   └── CustomPaletteProvider.js  # 扩展默认工具栏的自定义条目
+        │   ├── CustomPaletteProvider.js  # 扩展默认工具栏的自定义条目
+        │   ├── CustomElementsProvider.js # 后端自定义元素 provider（分页 + 搜索 + 浮动布局）
+        │   ├── CustomElementsStore.js    # 自定义元素分页 / 搜索状态管理
+        │   └── pagination.css            # 分页条 / 搜索框 / 状态提示样式
+        ├── api/
+        │   └── customElements.js  # 自定义元素 API 适配层（含 mock 示例）
         └── i18n/
             ├── index.js           # translate 模块（DI 定义）
             └── customTranslate.js # 中文翻译资源合并与覆盖
@@ -327,6 +332,8 @@ function handleSaved(formBean) {
 }
 ```
 
+`CustomPaletteProvider` 会把默认 palette 中非白名单分组的条目统一归入 `default` 分组，而 `custom` 与 `custom-elements`（后端自定义元素，见"工具栏"一节）分组保持不变。
+
 **图标来源：**
 
 - **bpmn-js 内置图标**：`bpmn-icon-user-task`、`bpmn-icon-service-task`、`bpmn-icon-script-task` 等（推荐用于标准 BPMN 元素）
@@ -395,6 +402,52 @@ accordionPalette: {
 }
 ```
 
+### 自定义元素（后端分页）
+
+`CustomElementsProvider` 会把后端接口返回的自定义元素渲染到 palette 中，支持**分页浏览**与**按名称搜索**，元素按 `item.group` 归类到不同分组。
+
+**数据契约：**
+
+在 `BpmnModeler.vue` 中通过 `customElements` 配置提供分页拉取函数：
+
+```javascript
+customElements: {
+  fetchPage: fetchCustomElements, // 分页拉取函数
+  pageSize: 12,                   // 每页条数
+  groupName: '自定义元素'          // item.group 缺失时的兜底分组名
+}
+```
+
+`fetchPage` 的签名与返回值约定：
+
+```javascript
+fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空串
+  => Promise<{ list, total }>          // total 用于计算总页数
+```
+
+`list` 中每个元素的结构：
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `id` | 是 | 唯一标识 |
+| `name` | 是 | 显示名称（参与搜索匹配） |
+| `type` | 是 | 要创建的 BPMN 类型，如 `bpmn:UserTask` |
+| `group` | 否 | 所属分组名（palette 分组标题），缺失时归入 `groupName` |
+| `iconClass` | 否 | 图标 CSS 类；不传时按 `type` 兜底映射内置图标 |
+| `options` | 否 | 创建元素时的额外属性（如 Camunda 扩展属性） |
+
+**交互与布局：**
+
+- **搜索**：搜索框固定在分组区顶部；输入防抖 300ms 自动搜索、回车立即搜索；搜索结果从第 1 页开始，关键字保留在输入框内并保持焦点
+- **分页**：分页条固定在面板最底部；数据多于 1 页时显示 上一页 / 页码 / 下一页
+- **状态提示**：加载中、首载失败（可点击重试）、无匹配 / 暂无数据提示均为浮动消息
+- **独立于分组**：搜索框、状态提示、分页条都不属于任何手风琴分组，折叠 / 展开分组不会影响它们
+- **分组折叠状态保留**：搜索或翻页触发重建后，各分组的展开 / 折叠状态会按分组名恢复
+
+**接入真实后端：**
+
+默认的 `src/api/customElements.js` 提供 mock 实现（内置示例数据）。真实项目把 `fetchCustomElements` 替换为你的接口，并在字段不一致时按文件内注释做映射即可。
+
 ## 常见问题
 
 ### Q: 如何加载我自己的 BPMN 流程？
@@ -427,6 +480,10 @@ function onSaved(formBean) {
 ### Q: 如何添加新的工具到工具栏？
 
 A: 编辑 `src/components/palette/CustomPaletteProvider.js`，在 `getPaletteEntries` 函数返回的对象中添加新条目（参考本文档的"自定义工具栏"部分）。
+
+### Q: 如何接入后端的自定义元素列表？
+
+A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider`，它会自动获得分页与搜索能力（详见"自定义元素"一节）。
 
 ### Q: 如何修改工具栏图标？
 
