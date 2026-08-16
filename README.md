@@ -524,6 +524,74 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 
 bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、translateModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
 
+### 非 Vue 组件接入 Vue 的重构技巧（palette 实战）
+
+本项目在把 palette（diagram-js 拥有的 DOM）从命令式 DOM 操作重构为 Vue 声明式/响应式时，沉淀了一套可复用的技巧。核心思想：**Vue 不接管第三方库持有的 DOM，而是在其旁边"另起炉灶"**。
+
+#### 约束与问题
+
+palette 的 DOM 归 diagram-js 所有：`AccordionPalette._update()` 每次调用都会 `domClear` 后重建 `.djs-palette-entries`，所以：
+
+- Vue 无法接管这些节点（会被随时删除重建）
+- 旧实现只能用 `createElement`/`innerHTML`/`querySelector`/事件委托手动维护，代码长且易错
+
+#### 技巧 1：持久宿主节点 + `display: contents`
+
+在库管理的 DOM **之外**（`.djs-palette-entries` 的兄弟位置）创建宿主 `<div>`，把 Vue 应用挂载进去：
+
+```js
+const entries = container.querySelector('.djs-palette-entries')
+container.insertBefore(toolbarHost, entries) // 工具栏
+container.insertBefore(panelHost, entries.nextSibling) // 面板（放在 entries 之后）
+```
+
+宿主节点不在重建范围内，Vue 状态跨 `_update()` 存活。宿主设置 `display: contents`，不产生任何盒子，其子元素直接参与 `.djs-palette` 的布局，顺序由插入位置决定：
+
+```css
+.djs-custom-elements-host { display: contents; }
+```
+
+#### 技巧 2：用 `reactive()` 包 class store
+
+纯 JS 状态类（如 `CustomElementsStore`）用 `reactive()` 包裹后即可被 Vue 追踪：
+
+```js
+this._store = reactive(new CustomElementsStore(config))
+```
+
+类上的 `getter` 会随底层数据自动变成响应式派生值（如 `totalPages`、`hasPrev`），模板里直接读取即可，无需手动通知更新。
+
+#### 技巧 3：模板替代 `innerHTML`
+
+搜索框、分页条、加载/空态提示全部改为 `<template>` 声明式渲染：
+
+- `v-model` + `watch` 防抖替代手写 `input` 监听
+- `v-if/v-else` 替代 `el.innerHTML = ...` 拼接
+- `:disabled` / `@click` 替代手动改 `disabled` 属性和事件委托
+- 文本自动转义，删掉手写 `escapeHtml`
+- 输入框由 Vue 管理，重渲染不再丢失焦点/光标
+
+#### 技巧 4：响应式状态替代快照/恢复
+
+折叠状态存响应式 `Map`（`reactive(new Map())`），直接绑定 `<details>` 的 `:open` / `@toggle`；翻页后按分组 key 恢复展开状态，删掉了手动快照与还原逻辑。
+
+#### 技巧 5：挂载时机与销毁清理
+
+库容器在初始化完成前不存在，用事件保证挂载时机：
+
+```js
+eventBus.once('diagram.init', () => this._mount())
+```
+
+（需确认 `AccordionPalette` 的 `diagram.init` 监听先注册、`_container` 已创建；didi 会先执行完所有模块的 `__init__` 才触发 `diagram.init`。）
+
+销毁时通过 `diagram.destroy` 事件 `unmount()`，避免泄漏。多个 `createApp` 作为互相独立的 Vue "island" 挂在宿主上，与主应用互不影响。
+
+#### 适用边界
+
+- 适用于**库持有 DOM 且频繁重建**的场景；若 DOM 由业务侧完全掌控，直接写 Vue 组件即可
+- 库自身的渲染逻辑（如 palette 条目）仍需走其 provider API，不能越过库直接操作
+
 ## 注意事项
 
 ### 1. activeElement 必须使用 shallowRef

@@ -51,7 +51,7 @@ export default class CustomElementsProvider {
   /**
    * 创建两个宿主节点并挂载 Vue 应用。
    * 宿主 display: contents，不参与布局，子元素直接参与 .djs-palette 的布局。
-   * DOM 顺序：工具栏 → 自定义元素面板 → 默认条目（diagram-js entries）。
+   * DOM 顺序：工具栏 → 默认条目（diagram-js entries）→ 自定义元素面板（下方区块）。
    */
   _mount() {
     if (this._mounted) return
@@ -66,7 +66,7 @@ export default class CustomElementsProvider {
     const entries = container.querySelector('.djs-palette-entries')
     if (entries) {
       container.insertBefore(toolbarHost, entries)
-      container.insertBefore(panelHost, entries)
+      container.insertBefore(panelHost, entries.nextSibling)
     } else {
       container.appendChild(toolbarHost)
       container.appendChild(panelHost)

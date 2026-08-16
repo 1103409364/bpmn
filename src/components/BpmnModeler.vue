@@ -740,9 +740,11 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   color: #374151;
 }
 
-/* 折叠面板分组标题（事件/网关/活动等） */
+/* 折叠面板分组标题（事件/网关/活动等）：文字缩小、行高收紧，整体更紧凑 */
 .djs-accordion-palette .djs-accordion-group summary {
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 28px;
+  font-weight: 600;
 }
 
 .djs-accordion-palette-collapse {

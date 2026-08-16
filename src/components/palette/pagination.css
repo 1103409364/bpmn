@@ -10,6 +10,56 @@
   display: none;
 }
 
+/* 上方区块：默认 BPMN 分组（diagram-js entries）以卡片形态呈现 */
+.djs-accordion-palette .djs-palette-entries {
+  display: block;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+/* 自定义元素面板（下方区块）以"卡片"形态呈现，白底与上方区块一致；
+   margin-top 与上方区块之间留出透明空隙 */
+.djs-accordion-palette .djs-custom-elements-panel {
+  display: block;
+  margin: 8px 0 0;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+/* 面板标题：浅灰底色突出标题栏身份，图标 + 文字与下方分组列表隔开 */
+.djs-accordion-palette .djs-custom-elements-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f3f4f6;
+  user-select: none;
+}
+
+/* 标题图标：与文字垂直居中对齐 */
+.djs-accordion-palette .djs-custom-elements-title .bpmn-icon-service-task {
+  font-size: 12px;
+  line-height: 1;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+/* 面板内的搜索框：相对标题与分组收窄内边距，保持卡片内对齐 */
+.djs-accordion-palette .djs-custom-elements-panel .djs-custom-elements-search {
+  padding: 6px 8px;
+}
+
 /* 自定义元素的分页条样式（浮动在分组区底部，独立于 accordion 分组） */
 .djs-accordion-palette .djs-custom-elements-pager {
   display: flex;

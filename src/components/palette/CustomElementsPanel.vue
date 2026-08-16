@@ -134,6 +134,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="djs-custom-elements-float djs-custom-elements-panel">
+    <!-- 区块标题：图标 + 标题，与下方默认分组区隔开 -->
+    <div class="djs-custom-elements-title">
+      <i class="bpmn-icon-service-task"></i>
+      <span>{{ t(groupName) }}</span>
+    </div>
+
     <!-- 搜索框：固定在分组区顶部 -->
     <div class="djs-custom-elements-search">
       <input
