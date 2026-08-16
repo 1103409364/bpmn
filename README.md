@@ -454,6 +454,21 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 - **分组折叠状态保留**：分组 `<details>` 的展开 / 折叠状态保存在响应式 `Map` 中，搜索或翻页后按分组名自动恢复
 - **独立于分组**：搜索框、状态提示、分页条不属于任何手风琴分组，折叠 / 展开分组不会影响它们
 
+**关于分组折叠结构 `<details>`：**
+
+分组折叠没有自己造轮子，直接用 HTML 原生 `<details>` + `<summary>` 实现：
+
+```html
+<details class="djs-accordion-group" :open="isGroupOpen(group.name)" @toggle="onToggleGroup(group.name, $event)">
+  <summary>{{ group.name }}</summary>
+  <div class="djs-palette-group"><!-- 该分组的元素条目 --></div>
+</details>
+```
+
+- **交互**：点击 `<summary>` 标题即切换展开 / 收起，无需任何 JS；`open` 属性控制默认状态，浏览器在开合变化时触发原生 `toggle` 事件，组件用它把状态写回响应式 `Map`，实现翻页 / 搜索后状态保留
+- **兼容性**：所有现代浏览器原生支持（Chrome / Edge / Firefox / Safari，Safari 自 6.0 起），仅 IE11 及更早不支持（已停止维护，可忽略）。且手风琴 palette（`diagram-js-accordion-palette`）内部正是用同一结构渲染各分组，样式类（`.djs-accordion-group`）天然对齐、无需额外适配
+- **样式复用**：`<details>` 与手风琴 palette 分组同款结构，因此分组标题的字体 / 行高等样式（`.djs-accordion-palette .djs-accordion-group summary`）由 `BpmnModeler.vue` 统一控制
+
 **架构说明：**
 
 `CustomElementsProvider` 把两个 Vue 应用（`CustomElementsPanel.vue` 与 `PaletteToolbar.vue`）挂载到 `.djs-palette` 容器内**持久存在的宿主节点**上。宿主节点是 `.djs-palette-entries` 的兄弟节点，不参与 layout（`display: contents`），因此不会随 diagram-js 的 `_update()` 清空重建，Vue 应用跨重建存活，状态与 DOM 均无需手动同步。`PaletteToolbar.vue` 负责工具栏的收起 / 展开（显隐由 CSS `.open` 类控制）。
