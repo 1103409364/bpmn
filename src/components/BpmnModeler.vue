@@ -12,8 +12,6 @@ import 'diagram-js-accordion-palette/assets/index.css'
 import PropertyPanel from './properties/PropertyPanel.vue'
 // 顶部工具栏组件：标题 + 撤销/重做 + 缩放 + 预览 + 下载 + 保存
 import ModelerToolbar from './toolbar/ModelerToolbar.vue'
-// 自定义元素（palette 分页数据源）API
-import { fetchCustomElements } from '../api/customElements'
 
 // 组件对外暴露的属性
 const props = defineProps({
@@ -175,14 +173,6 @@ async function initModeler() {
       showName: false, // 显示工具名称
       accordion: false, // 关闭手风琴模式，允许多个分组同时展开
       defaultOpenGroups: ['自定义元素'] // 默认展开的分组 'default', 'custom',
-    },
-    // customElements: 自定义元素分页配置（供 CustomElementsProvider 使用）
-    customElements: {
-      // fetchPage: 分页拉取函数，约定返回 Promise<{ list, total }>
-      // 真实项目里把它替换成你自己的后端接口（见 src/api/customElements.js）
-      fetchPage: fetchCustomElements,
-      pageSize: 12, // 每页条数
-      groupName: '自定义元素' // item.group 缺失时的兜底分组名（当前页元素按 item.group 归类）
     },
     // moddleExtensions: 扩展 XML 模型，告诉解析器 camunda: 命名空间下的属性如何解析
     // moddleExtensions: {

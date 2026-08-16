@@ -2,6 +2,8 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { assign } from 'min-dash'
 
+import { fetchCustomElements } from '../../api/customElements'
+
 // BPMN 元素类型 -> 内置图标类名 的兜底映射（item.iconClass 未提供时使用）
 const TYPE_ICON_MAP = {
   'bpmn:Task': 'bpmn-icon-task',
@@ -28,19 +30,31 @@ const TYPE_ICON_MAP = {
 }
 
 /**
- * 自定义元素面板（声明式版）。
+ * 自定义元素面板（声明式版，接口请求在组件内完成）。
  *
- * 数据全部来自 props.store（reactive 包裹的 CustomElementsStore），
- * 状态变化由 Vue 自动驱动重渲染，无需任何手动 DOM 注入/重建。
+ * 分页 / 搜索状态与接口请求全部收在本组件：onMounted 首载，watch 防抖搜索，
+ * 请求用序号（seq）做竞态保护——后发请求未返回时丢弃先发的旧结果。
+ * 状态变化由 Vue 自动驱动重渲染，无需任何手动 DOM 注入 / 重建。
  * - 搜索框：v-model + watch 防抖，回车立即搜索
- * - 状态提示：v-if 按 store 状态渲染（加载中/失败重试/空结果）
+ * - 状态提示：v-if 按状态渲染（加载中/失败重试/空结果）
  * - 分组列表：v-for 生成 <details>，折叠状态用响应式 Map 保存
- * - 分页条：:disabled 由 store 的 hasPrev/hasNext/loading 派生
+ * - 分页条：:disabled 由 totalPages/hasPrev/hasNext/loading 派生
  * 挂载在 .djs-palette 容器内持久存在的宿主节点上（不被 diagram-js 的
  * _update() 重建），因此输入框焦点、光标位置天然保留。
+ *
+ * 约定的接口返回结构（fetchPage prop）：
+ *   fetchPage({ page, pageSize, keyword }) => Promise<{ list, total }>
+ *   - list：当前页元素数组，元素结构约定为 { id, name, type, group?, iconClass?, options? }
+ *   - total：总条数（用于计算总页数）
+ *   - keyword：搜索关键字（名称模糊搜索），可为空字符串
+ * 若后端字段不同，在传入 fetchPage 的调用方做一次适配映射即可。
+ *
+ * 默认 fetchPage 指向 src/api/customElements.js 的 mock 实现；接入真实后端时，
+ * 修改下方 fetchPage 默认值（或改用其它 props 传入）即可。
  */
 const props = defineProps({
-  store: { type: Object, required: true },
+  fetchPage: { type: Function, default: fetchCustomElements },
+  pageSize: { type: Number, default: 12 },
   create: { type: Object, required: true },
   elementFactory: { type: Object, required: true },
   translate: { type: Function, required: true },
@@ -51,8 +65,52 @@ function t(text) {
   return props.translate(text)
 }
 
+// ---------- 分页 / 搜索状态 ----------
+const keyword = ref('') // 输入框当前值
+const searchKw = ref('') // 已生效的搜索关键字（非空时处于搜索态）
+const page = ref(1)
+const total = ref(0)
+const items = ref([])
+const loading = ref(false)
+const error = ref(null)
+const initialized = ref(false)
+
+// 请求序号：后发请求未返回时，先发的旧请求结果会被丢弃
+let seq = 0
+
+const searching = computed(() => !!searchKw.value)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / props.pageSize)))
+const hasPrev = computed(() => page.value > 1)
+const hasNext = computed(() => page.value < totalPages.value)
+
+/**
+ * 拉取指定页码的数据（默认第 1 页），带上当前搜索关键字。
+ * 请求失败时保留旧数据，错误信息可通过 error 读取。
+ */
+async function fetch(pageNo = 1) {
+  const current = ++seq
+  loading.value = true
+  error.value = null
+  try {
+    const res = await props.fetchPage({
+      page: pageNo,
+      pageSize: props.pageSize,
+      keyword: searchKw.value
+    })
+    if (current !== seq) return
+    page.value = pageNo
+    total.value = Number(res && res.total) || 0
+    items.value = (res && res.list) || []
+    initialized.value = true
+  } catch (err) {
+    if (current !== seq) return
+    error.value = err
+  } finally {
+    if (current === seq) loading.value = false
+  }
+}
+
 // ---------- 搜索 ----------
-const keyword = ref('')
 let debounceTimer = null
 
 watch(keyword, () => {
@@ -63,18 +121,17 @@ watch(keyword, () => {
 function applySearch() {
   clearTimeout(debounceTimer)
   debounceTimer = null
-  const store = props.store
   const kw = String(keyword.value || '').trim()
-  if (kw === store.keyword) return
-  store.search(kw)
+  if (kw === searchKw.value) return
+  searchKw.value = kw
+  fetch(1)
 }
 
 // ---------- 状态提示 ----------
 const status = computed(() => {
-  const store = props.store
-  if (!store.initialized && !store.error) return { mode: 'loading', text: '加载中...' }
-  if (!store.initialized && store.error) return { mode: 'retry', text: '加载失败，点击重试' }
-  if (!store.items.length) return { mode: 'empty', text: store.searching ? '无匹配自定义元素' : '暂无自定义元素' }
+  if (!initialized.value && !error.value) return { mode: 'loading', text: '加载中...' }
+  if (!initialized.value && error.value) return { mode: 'retry', text: '加载失败，点击重试' }
+  if (!items.value.length) return { mode: 'empty', text: searching.value ? '无匹配自定义元素' : '暂无自定义元素' }
   return null
 })
 
@@ -83,15 +140,14 @@ const status = computed(() => {
 const groupOpen = reactive(new Map())
 
 const grouped = computed(() => {
-  const store = props.store
-  if (!store.initialized || !store.items.length) return []
+  if (!initialized.value || !items.value.length) return []
   const groups = new Map()
-  store.items.forEach((item) => {
+  items.value.forEach((item) => {
     const name = item.group || props.groupName
     if (!groups.has(name)) groups.set(name, [])
     groups.get(name).push(item)
   })
-  return Array.from(groups, ([name, items]) => ({ name, items }))
+  return Array.from(groups, ([name, list]) => ({ name, items: list }))
 })
 
 function isGroupOpen(name) {
@@ -104,15 +160,15 @@ function onToggleGroup(name, event) {
 
 // ---------- 分页 ----------
 function prev() {
-  props.store.prev()
+  if (hasPrev.value) fetch(page.value - 1)
 }
 
 function next() {
-  props.store.next()
+  if (hasNext.value) fetch(page.value + 1)
 }
 
 function reload() {
-  props.store.load(1)
+  fetch(1)
 }
 
 // ---------- 创建元素 ----------
@@ -124,7 +180,7 @@ function handleCreate(event, item) {
 }
 
 onMounted(() => {
-  props.store.load(1)
+  fetch(1)
 })
 
 onBeforeUnmount(() => {
@@ -201,21 +257,21 @@ onBeforeUnmount(() => {
 
     <!-- 分页条：面板最底部 -->
     <div
-      v-if="store.initialized && !store.error && (store.totalPages > 1 || !store.items.length)"
+      v-if="initialized && !error && (totalPages > 1 || !items.length)"
       class="djs-custom-elements-float djs-custom-elements-pager"
     >
       <button
         type="button"
         class="djs-pager-btn djs-pager-prev"
-        :disabled="!store.hasPrev || store.loading"
+        :disabled="!hasPrev || loading"
         aria-label="上一页"
         @click="prev"
       >&lsaquo;</button>
-      <span class="djs-pager-info">{{ store.page }} / {{ store.totalPages }}</span>
+      <span class="djs-pager-info">{{ page }} / {{ totalPages }}</span>
       <button
         type="button"
         class="djs-pager-btn djs-pager-next"
-        :disabled="!store.hasNext || store.loading"
+        :disabled="!hasNext || loading"
         aria-label="下一页"
         @click="next"
       >&rsaquo;</button>

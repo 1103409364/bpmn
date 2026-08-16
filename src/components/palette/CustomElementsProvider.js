@@ -1,6 +1,5 @@
-import { reactive, createApp } from 'vue'
+import { createApp } from 'vue'
 
-import CustomElementsStore from './CustomElementsStore'
 import CustomElementsPanel from './CustomElementsPanel.vue'
 import PaletteToolbar from './PaletteToolbar.vue'
 
@@ -8,9 +7,10 @@ import PaletteToolbar from './PaletteToolbar.vue'
  * 自定义元素 palette 引导模块（声明式版）。
  *
  * 职责：
- * - 用 reactive() 包裹 CustomElementsStore，把分页/搜索状态变成响应式数据
- * - 把 CustomElementsPanel（搜索/分组/分页）与 PaletteToolbar（收起/展开）
+ * - 把 CustomElementsPanel（搜索/分组/分页/状态提示）与 PaletteToolbar（收起/展开）
  *   两个 Vue 应用挂载到 .djs-palette 容器内【持久存在的宿主节点】上
+ * - 数据请求与分页状态由 CustomElementsPanel 在组件内部完成（fetchPage 默认值见
+ *   CustomElementsPanel.vue，指向 src/api/customElements.js 的 mock 实现）
  *
  * 关键点：宿主节点是 .djs-palette-entries 的兄弟节点，diagram-js 的
  * _update() 只清空重建 entries 自身，宿主与 Vue 应用可以跨重建存活，
@@ -20,19 +20,15 @@ import PaletteToolbar from './PaletteToolbar.vue'
  * 的 createAction 行为一致），见 CustomElementsPanel.vue 的 handleCreate。
  */
 export default class CustomElementsProvider {
-  static $inject = ['palette', 'create', 'elementFactory', 'translate', 'config.customElements', 'eventBus']
+  static $inject = ['palette', 'create', 'elementFactory', 'translate', 'eventBus']
 
-  constructor(palette, create, elementFactory, translate, config, eventBus) {
+  constructor(palette, create, elementFactory, translate, eventBus) {
     this._palette = palette
 
-    // 响应式 store：getters（totalPages/hasPrev/hasNext...）随内部状态自动派生
-    this._store = reactive(new CustomElementsStore(config || {}))
     this._panelProps = {
-      store: this._store,
       create,
       elementFactory,
-      translate,
-      groupName: (config && config.groupName) || '自定义元素'
+      translate
     }
 
     // palette 容器在 diagram.init 后才会创建（AccordionPalette 在 diagram.init

@@ -42,10 +42,9 @@ bpmn/
         ├── palette/
         │   ├── index.js                   # 自定义 palette 模块（DI 定义）
         │   ├── CustomPaletteProvider.js   # 扩展默认工具栏的自定义条目
-        │   ├── CustomElementsProvider.js  # 自定义元素引导模块（响应式 store + 挂载 Vue 面板）
-        │   ├── CustomElementsPanel.vue    # 自定义元素面板（声明式：搜索 / 分组 / 分页 / 状态提示）
+        │   ├── CustomElementsProvider.js  # 自定义元素引导模块（挂载 Vue 面板到持久宿主）
+        │   ├── CustomElementsPanel.vue    # 自定义元素面板（声明式：接口请求 / 搜索 / 分组 / 分页）
         │   ├── PaletteToolbar.vue         # 工具栏收起 / 展开（声明式）
-        │   ├── CustomElementsStore.js     # 自定义元素分页 / 搜索状态管理
         │   └── pagination.css             # 分页条 / 搜索框 / 状态提示样式
         ├── api/
         │   └── customElements.js  # 自定义元素 API 适配层（含 mock 示例）
@@ -412,14 +411,17 @@ accordionPalette: {
 
 **数据契约：**
 
-在 `BpmnModeler.vue` 中通过 `customElements` 配置提供分页拉取函数：
+接口请求与配置全部在 `CustomElementsPanel.vue` 内完成。`fetchPage` 为组件的 prop 并有默认值，默认指向 `src/api/customElements.js` 的 mock 实现；接入真实后端时修改组件内默认值（或调用方传入 props 覆盖）：
 
 ```javascript
-customElements: {
-  fetchPage: fetchCustomElements, // 分页拉取函数
-  pageSize: 12,                   // 每页条数
-  groupName: '自定义元素'          // item.group 缺失时的兜底分组名
-}
+// CustomElementsPanel.vue
+import { fetchCustomElements } from '../../api/customElements'
+
+defineProps({
+  fetchPage: { type: Function, default: fetchCustomElements }, // 分页拉取函数
+  pageSize:  { type: Number,   default: 12 },                  // 每页条数
+  groupName: { type: String,   default: '自定义元素' }          // item.group 缺失时的兜底分组名
+})
 ```
 
 `fetchPage` 的签名与返回值约定：
@@ -442,7 +444,7 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 
 **交互与布局（声明式实现）：**
 
-- **声明式渲染**：搜索框、状态提示、分组列表、分页条全部由 `CustomElementsPanel.vue` 模板渲染；数据源是 `reactive()` 包裹的 `CustomElementsStore`（getters 自动成为响应式派生值），状态变化由 Vue 自动驱动重渲染，无需任何手动 DOM 注入 / 重建
+- **声明式渲染**：搜索框、状态提示、分组列表、分页条全部由 `CustomElementsPanel.vue` 模板渲染；分页 / 搜索状态是组件内 `ref`，接口请求（`fetchPage`）在组件内 `onMounted` / 防抖 `watch` 中发起，状态变化由 Vue 自动驱动重渲染，无需任何手动 DOM 注入 / 重建
 - **搜索**：`v-model` + 300ms 防抖自动搜索、回车立即搜索；输入框由 Vue 管理，搜索后焦点与光标位置天然保留
 - **分页**：分页条位于面板最底部；数据多于 1 页时显示 上一页 / 页码 / 下一页，按钮可用态由 `hasPrev / hasNext / loading` 派生
 - **状态提示**：加载中、首载失败（可点击重试）、无匹配 / 暂无数据均为条件渲染（`v-if`）的浮动消息
@@ -455,7 +457,7 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 
 **接入真实后端：**
 
-默认的 `src/api/customElements.js` 提供 mock 实现（内置示例数据）。真实项目把 `fetchCustomElements` 替换为你的接口，并在字段不一致时按文件内注释做映射即可。
+默认的 `src/api/customElements.js` 提供 mock 实现（内置示例数据）。真实项目把 `fetchCustomElements` 替换为你的接口，并在字段不一致时按文件内注释做映射即可。由于 `fetchCustomElements` 作为 `CustomElementsPanel.vue` 的 `fetchPage` 默认值直接引用，替换后自动生效。
 
 ## 常见问题
 
@@ -492,7 +494,7 @@ A: 编辑 `src/components/palette/CustomPaletteProvider.js`，在 `getPaletteEnt
 
 ### Q: 如何接入后端的自定义元素列表？
 
-A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider` 与 `CustomElementsPanel.vue`，它们会自动获得分页与搜索能力（详见"自定义元素"一节）。
+A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider`，由于 `CustomElementsPanel.vue` 的 `fetchPage` 默认值直接引用该函数，替换后自动生效（详见"自定义元素"一节）。
 
 ### Q: 如何修改工具栏图标？
 
@@ -551,15 +553,33 @@ container.insertBefore(panelHost, entries.nextSibling) // 面板（放在 entrie
 .djs-custom-elements-host { display: contents; }
 ```
 
-#### 技巧 2：用 `reactive()` 包 class store
+#### 技巧 2：数据请求与状态收进组件（`ref` 化）
 
-纯 JS 状态类（如 `CustomElementsStore`）用 `reactive()` 包裹后即可被 Vue 追踪：
+接口请求与分页状态直接放回 Vue 组件（`CustomElementsPanel.vue`）——状态用 `ref` / `computed` 声明，`onMounted` 首载、`watch` 防抖搜索、翻页方法直接调 `fetchPage`。请求竞态用序号 `seq` 保护（后发请求未返回时丢弃先发结果）：
 
 ```js
-this._store = reactive(new CustomElementsStore(config))
+const page = ref(1)
+const total = ref(0)
+const items = ref([])
+const loading = ref(false)
+const error = ref(null)
+
+async function fetch(pageNo = 1) {
+  const current = ++seq
+  loading.value = true
+  try {
+    const res = await props.fetchPage({ page: pageNo, pageSize, keyword })
+    if (current !== seq) return
+    page.value = pageNo
+    total.value = Number(res && res.total) || 0
+    items.value = (res && res.list) || []
+  } finally {
+    if (current === seq) loading.value = false
+  }
+}
 ```
 
-类上的 `getter` 会随底层数据自动变成响应式派生值（如 `totalPages`、`hasPrev`），模板里直接读取即可，无需手动通知更新。
+这是 Vue 组件做数据获取的惯用做法；若状态需要脱离组件共享或单测，才考虑把状态类用 `reactive()` 包裹（getters 会自动成为响应式派生值）。本面板规模较小，最终采用了组件内 `ref` 方案。
 
 #### 技巧 3：模板替代 `innerHTML`
 
