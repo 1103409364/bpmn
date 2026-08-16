@@ -39,6 +39,9 @@ bpmn/
         ├── BpmnModeler.vue        # 核心流程设计器组件
         ├── properties/
         │   └── PropertyPanel.vue   # 元素属性编辑面板
+        ├── behavior/
+        │   ├── index.js                     # 默认创建行为模块（DI 定义）
+        │   └── DefaultCreateBehavior.js     # 新建元素时写入默认属性（如 StartEvent 默认名）
         ├── palette/
         │   ├── index.js                   # 自定义 palette 模块（DI 定义）
         │   ├── CustomPaletteProvider.js   # 扩展默认工具栏的自定义条目
@@ -360,6 +363,40 @@ function handleSaved(formBean) {
 }
 ```
 
+### 默认创建行为（DefaultCreateBehavior）
+
+`src/components/behavior/DefaultCreateBehavior.js` 在**新建元素**时统一写入默认属性，当前给 `bpmn:StartEvent` 写入默认 name（"开始"）。从 palette 拖入 / contextPad 追加新建的开始事件会直接显示该名称，且保存时序列化到 XML。
+
+**原理：**
+
+新建元素的操作最终都会执行 `shape.create` 命令。该行为模块是一个 `CommandInterceptor`，在命令的 `preExecute` 阶段（真正执行前）按元素类型写入默认值；随后 bpmn-js 的 `LabelBehavior` 会自动创建标签，画布即时显示默认名称。
+
+**扩展其他默认属性：**
+
+在 `preExecute` 回调里按 `bo.$type` 分支追加即可：
+
+```javascript
+this.preExecute('shape.create', (event) => {
+  const shape = event.context && event.context.shape
+  const bo = shape && shape.businessObject
+  if (!bo) return
+
+  if (bo.$type === 'bpmn:StartEvent' && !bo.name) {
+    bo.name = '开始'
+  }
+
+  // 例如：给所有用户任务写入默认 name
+  // if (bo.$type === 'bpmn:UserTask' && !bo.name) {
+  //   bo.name = '审批任务'
+  // }
+})
+```
+
+注意：
+
+- 只在属性为空时写入，不覆盖已命名 / 已导入的流程（`importXML` 不走 `shape.create` 命令，不会触发本行为）
+- 直接给 `businessObject` 赋值写入的是标准 BPMN 属性（如 `name`），会随 `saveXML` 序列化到 XML；扩展属性需用 `businessObject.set(key, value)` 才能被 moddle 追踪并序列化
+
 ## 工具栏（Palette）
 
 使用 [diagram-js-accordion-palette](https://github.com/miyuesc/diagram-js-accordion-palette) 替换默认 palette，支持按分组折叠 / 展开。
@@ -542,7 +579,7 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 
 ### 依赖注入架构
 
-bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、translateModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
+bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、contextPadModule、translateModule、defaultCreateBehaviorModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
 
 ### 非 Vue 组件接入 Vue 的重构技巧（palette 实战）
 

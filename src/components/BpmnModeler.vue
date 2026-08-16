@@ -157,8 +157,10 @@ async function initModeler() {
   const { contextPadModule } = await import('./context/index')
   // 中文本地化模块：覆盖 translate 服务，把默认工具提示翻译成中文
   const { translateModule } = await import('./i18n/index')
+  // 默认名称行为模块：新建 bpmn:StartEvent 时自动写入默认 name
+  const { defaultCreateBehaviorModule } = await import('./behavior/index')
   // 手风琴折叠式 palette 模块：替换默认的 palette 服务，按分组折叠/展开
-  const { default: AccordionPaletteModule } = await import('diagram-js-accordion-palette')
+  const { default: accordionPaletteModule } = await import('diagram-js-accordion-palette')
   // 视觉网格模块：在画布上显示点状网格（SVG 实现，无需引入样式）
   const { default: gridModule } = await import('diagram-js-grid')
 
@@ -167,7 +169,14 @@ async function initModeler() {
     // container: 画布挂载到哪个 DOM 元素（bpmn-js 会在此元素内渲染 svg 图形）
     container: canvasRef.value,
     // additionalModules: 额外注册的模块（自定义 palette、手风琴 palette、网格、中文本地化）
-    additionalModules: [paletteModule, contextPadModule, translateModule, AccordionPaletteModule, gridModule],
+    additionalModules: [
+      paletteModule,
+      contextPadModule,
+      translateModule,
+      accordionPaletteModule,
+      gridModule,
+      defaultCreateBehaviorModule
+    ],
     // accordionPalette: 手风琴 palette 的配置
     accordionPalette: {
       showName: false, // 显示工具名称
