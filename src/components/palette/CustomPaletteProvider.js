@@ -35,7 +35,12 @@ export default class CustomPaletteProvider {
 
     return (entries) => {
       forEach(entries, (entry) => {
-        if (entry && entry.group !== 'custom' && entry.group !== 'custom-elements' && entry.group !== 'default') {
+        // 注意：'tools' 分组（hand/lasso/space 工具）必须保留原名，不能归并到 'default'。
+        // 手风琴 palette（diagram-js-accordion-palette）点击工具后通过 tool-manager.update
+        // 触发 updateToolHighlight()，它用 query('[data-group=tools]', ...) 定位工具条目；
+        // 一旦改名，DOM 里不存在 [data-group=tools]，toolsContainer 为 null，
+        // 遍历 toolsContainer.children 就会抛 "can't access property 'children', toolsContainer is null"。
+        if (entry && entry.group !== 'custom' && entry.group !== 'custom-elements' && entry.group !== 'default' && entry.group !== 'tools') {
           entry.group = 'default'
         }
       })
@@ -52,21 +57,21 @@ export default class CustomPaletteProvider {
         //   'custom-icon-class',  // 改成你的自定义类名
         //   translate('创建自定义任务')
         // )
-        'create.user-task': createAction('bpmn:UserTask', 'custom', 'bpmn-icon-user-task', translate('创建用户任务')),
-        'create.service-task': createAction('bpmn:ServiceTask', 'custom', 'bpmn-icon-service-task', translate('创建服务任务')),
-        'create.script-task': createAction('bpmn:ScriptTask', 'custom', 'bpmn-icon-script-task', translate('创建脚本任务')),
-        'create.send-task': createAction('bpmn:SendTask', 'custom', 'bpmn-icon-send-task', translate('创建发送任务')),
-        'create.receive-task': createAction('bpmn:ReceiveTask', 'custom', 'bpmn-icon-receive-task', translate('创建接收任务')),
+        // 'create.user-task': createAction('bpmn:UserTask', 'custom', 'bpmn-icon-user-task', translate('创建用户任务')),
+        // 'create.service-task': createAction('bpmn:ServiceTask', 'custom', 'bpmn-icon-service-task', translate('创建服务任务')),
+        // 'create.script-task': createAction('bpmn:ScriptTask', 'custom', 'bpmn-icon-script-task', translate('创建脚本任务')),
+        // 'create.send-task': createAction('bpmn:SendTask', 'custom', 'bpmn-icon-send-task', translate('创建发送任务')),
+        // 'create.receive-task': createAction('bpmn:ReceiveTask', 'custom', 'bpmn-icon-receive-task', translate('创建接收任务')),
 
         // 注意：画布中任务的图标由 BPMN 类型决定。
         // bpmn:Task 是通用任务类型，默认不显示内置图标；
         // 若希望图标与工具栏保持一致，请使用标准任务类型：
         // bpmn:UserTask / bpmn:ServiceTask / bpmn:ScriptTask /
         // bpmn:SendTask / bpmn:ReceiveTask / bpmn:ManualTask / bpmn:BusinessRuleTask
-        'create.test-task': createAction('bpmn:UserTask', 'custom', 'custom-icon-test', translate('创建测试任务')),
+        // 'create.test-task': createAction('bpmn:UserTask', 'custom', 'custom-icon-test', translate('创建测试任务')),
 
         // 文本标注（默认 palette 没有）
-        'create.text-annotation': createAction('bpmn:TextAnnotation', 'custom', 'bpmn-icon-text-annotation', translate('创建文本标注')),
+        // 'create.text-annotation': createAction('bpmn:TextAnnotation', 'custom', 'bpmn-icon-text-annotation', translate('创建文本标注')),
 
         // ———————— 自定义动作类工具 ————————
         // 非创建元素的自定义工具，可执行任意操作（删除、复制、导出等）。
@@ -98,16 +103,16 @@ export default class CustomPaletteProvider {
         //     }
         //   }
         // }
-        'custom.delete-selection': {
-          group: 'custom',
-          className: 'bpmn-icon-trash',
-          title: translate('删除选中的元素'),
-          action: {
-            click: () => {
-              this._modeling.removeElements(this._selection.get())
-            }
-          }
-        }
+        // 'custom.delete-selection': {
+        //   group: 'custom',
+        //   className: 'bpmn-icon-trash',
+        //   title: translate('删除选中的元素'),
+        //   action: {
+        //     click: () => {
+        //       this._modeling.removeElements(this._selection.get())
+        //     }
+        //   }
+        // }
       })
     }
   }
