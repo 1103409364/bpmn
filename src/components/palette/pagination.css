@@ -123,8 +123,31 @@
   flex-shrink: 0;
 }
 
-.djs-accordion-palette .djs-custom-elements-status-loading {
-  color: #6b7280;
+/* 标题右侧加载提示：请求进行中在标题栏展示 spinner（靠右显示） */
+.djs-accordion-palette .djs-custom-elements-title-loading {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  user-select: none;
+}
+
+/* 旋转小圆环 */
+.djs-accordion-palette .djs-custom-elements-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid #e5e7eb;
+  border-top-color: #10b981;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: djs-custom-elements-spin 0.8s linear infinite;
+}
+
+@keyframes djs-custom-elements-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .djs-accordion-palette .djs-custom-elements-status-empty {

@@ -131,7 +131,8 @@ function applySearch() {
 
 // ---------- 状态提示 ----------
 const status = computed(() => {
-  if (!initialized.value && !error.value) return { mode: 'loading', text: '加载中...' }
+  // 加载中由标题栏 spinner 承担（见模板 .djs-custom-elements-title-loading），此处只处理重试 / 空结果
+  if (loading.value) return null
   if (!initialized.value && error.value) return { mode: 'retry', text: '加载失败，点击重试' }
   if (!items.value.length) return { mode: 'empty', text: searching.value ? '无匹配自定义元素' : '暂无自定义元素' }
   return null
@@ -208,10 +209,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="djs-custom-elements-float djs-custom-elements-panel">
-    <!-- 区块标题：图标 + 标题，与下方默认分组区隔开 -->
+    <!-- 区块标题：图标 + 标题，与下方默认分组区隔开；请求进行中在标题右侧显示加载提示 -->
     <div class="djs-custom-elements-title">
       <i class="bpmn-icon-service-task"></i>
       <span>{{ t(groupName) }}</span>
+      <span v-if="loading" class="djs-custom-elements-title-loading">
+        <span class="djs-custom-elements-spinner"></span>
+      </span>
     </div>
 
     <!-- 搜索框：固定在分组区顶部 -->
@@ -227,15 +231,9 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <!-- 加载中 / 首载失败重试：位于搜索框与分组之间 -->
+    <!-- 首载失败重试：位于搜索框与分组之间 -->
     <div
-      v-if="status && status.mode === 'loading'"
-      class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-loading"
-    >
-      {{ t(status.text) }}
-    </div>
-    <div
-      v-else-if="status && status.mode === 'retry'"
+      v-if="status && status.mode === 'retry'"
       class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-retry"
       @click="reload"
     >

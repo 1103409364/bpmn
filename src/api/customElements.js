@@ -54,6 +54,11 @@ function mockFetchCustomElements({ page, pageSize, keyword }) {
   }
 }
 
+// 模拟网络延迟（便于观察加载中 / 竞态保护效果），接入真实后端时去掉 delay 即可
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
  * 分页拉取自定义元素。
  * 参数：{ page, pageSize, keyword }，keyword 为名称模糊搜索关键字（可为空串）。
@@ -77,6 +82,6 @@ function mockFetchCustomElements({ page, pageSize, keyword }) {
  * })
  * ```
  */
-export function fetchCustomElements({ page, pageSize, keyword }) {
-  return Promise.resolve(mockFetchCustomElements({ page, pageSize, keyword }))
+export function fetchCustomElements(params) {
+  return delay(1800).then(() => mockFetchCustomElements(params))
 }
