@@ -705,7 +705,6 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   align-items: center;
   justify-content: space-between;
   height: 36px;
-  padding: 0 6px 0 12px;
   margin-bottom: 4px;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -751,13 +750,25 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   line-height: 1;
-  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
 .djs-accordion-palette-collapse:hover {
   border-color: #10b981;
   color: #10b981;
   background: #f0fdf4;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
+}
+
+.djs-accordion-palette-collapse:active {
+  background: #d1fae5;
+  transform: scale(0.94);
+}
+
+.djs-accordion-palette-collapse:focus-visible,
+.djs-accordion-palette-handle:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
 }
 
 /* 收起后收缩成一个小手柄，点击重新展开 */
@@ -779,7 +790,8 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   justify-content: center;
   cursor: pointer;
   color: #374151;
-  transition: color 0.15s;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s, transform 0.1s;
 }
 
 .djs-accordion-palette.djs-palette:not(.open) .djs-accordion-palette-handle {
@@ -788,5 +800,11 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
 
 .djs-accordion-palette-handle:hover {
   color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.djs-accordion-palette-handle:active {
+  background-color: #d1fae5;
+  transform: scale(0.96);
 }
 </style>

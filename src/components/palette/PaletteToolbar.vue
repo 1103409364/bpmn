@@ -29,8 +29,12 @@ const props = defineProps({
 
   <div
     class="djs-accordion-palette-handle"
+    role="button"
+    tabindex="0"
     title="展开工具栏"
     @click.stop="props.palette.open()"
+    @keydown.enter.prevent="props.palette.open()"
+    @keydown.space.prevent="props.palette.open()"
   >
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
       <path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
