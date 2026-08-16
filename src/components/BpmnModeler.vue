@@ -215,9 +215,6 @@ async function initModeler() {
 
   // modeler 初始化完成，通知 Vue 重渲染
   modelerReady.value = true
-
-  // 为手风琴 palette 挂载收起按钮
-  setupPaletteCollapse()
 }
 
 /**
@@ -378,56 +375,10 @@ function onTaskInfoChange({ key, value }) {
 }
 
 /**
- * 手风琴 palette 收起/展开：
- * - 展开时顶部工具栏提供"收起"按钮，点击后隐藏 palette
- * - 隐藏后只留一个左上角的小手柄，点击即可重新展开
+ * 手风琴 palette 的收起/展开已由 palette 模块内的 PaletteToolbar.vue（声明式）
+ * 负责：PaletteToolbar 挂载在 .djs-palette 容器中，显隐由 CSS 的 .open 类控制，
+ * 点击直接调用 palette 服务的 open()/close()。
  */
-function setupPaletteCollapse() {
-  const palette = modeler.get('palette')
-  const paletteEl = canvasRef.value.querySelector('.djs-accordion-palette')
-  if (!palette || !paletteEl) return
-
-  // 顶部工具栏：标题 + 收起按钮（仅展开时显示）
-  const toolbar = document.createElement('div')
-  toolbar.className = 'djs-accordion-palette-toolbar'
-  const title = document.createElement('span')
-  title.className = 'djs-accordion-palette-title'
-  title.textContent = '工具栏'
-  const collapseBtn = document.createElement('button')
-  collapseBtn.type = 'button'
-  collapseBtn.className = 'djs-accordion-palette-collapse'
-  collapseBtn.title = '收起工具栏'
-  collapseBtn.innerHTML =
-    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
-    '<path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-    '</svg>'
-  collapseBtn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (palette.isOpen()) {
-      palette.close()
-    }
-  })
-  toolbar.appendChild(title)
-  toolbar.appendChild(collapseBtn)
-  // 插入到条目容器之前，让工具栏显示在 palette 顶部
-  paletteEl.prepend(toolbar)
-
-  // 隐藏后的展开入口：左上角的小手柄（点击重新展开）
-  const handle = document.createElement('div')
-  handle.className = 'djs-accordion-palette-handle'
-  handle.title = '展开工具栏'
-  handle.innerHTML =
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
-    '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-    '<path d="M14 2v4M8 10v4M16 18v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-    '</svg>'
-  handle.addEventListener('click', () => {
-    if (!palette.isOpen()) {
-      palette.open()
-    }
-  })
-  paletteEl.appendChild(handle)
-}
 
 // commandStack service：记录所有编辑操作，提供撤销/重做
 function updateCommandState() {

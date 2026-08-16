@@ -40,11 +40,13 @@ bpmn/
         ├── properties/
         │   └── PropertyPanel.vue   # 元素属性编辑面板
         ├── palette/
-        │   ├── index.js           # 自定义 palette 模块（DI 定义）
-        │   ├── CustomPaletteProvider.js  # 扩展默认工具栏的自定义条目
-        │   ├── CustomElementsProvider.js # 后端自定义元素 provider（分页 + 搜索 + 浮动布局）
-        │   ├── CustomElementsStore.js    # 自定义元素分页 / 搜索状态管理
-        │   └── pagination.css            # 分页条 / 搜索框 / 状态提示样式
+        │   ├── index.js                   # 自定义 palette 模块（DI 定义）
+        │   ├── CustomPaletteProvider.js   # 扩展默认工具栏的自定义条目
+        │   ├── CustomElementsProvider.js  # 自定义元素引导模块（响应式 store + 挂载 Vue 面板）
+        │   ├── CustomElementsPanel.vue    # 自定义元素面板（声明式：搜索 / 分组 / 分页 / 状态提示）
+        │   ├── PaletteToolbar.vue         # 工具栏收起 / 展开（声明式）
+        │   ├── CustomElementsStore.js     # 自定义元素分页 / 搜索状态管理
+        │   └── pagination.css             # 分页条 / 搜索框 / 状态提示样式
         ├── api/
         │   └── customElements.js  # 自定义元素 API 适配层（含 mock 示例）
         └── i18n/
@@ -332,7 +334,7 @@ function handleSaved(formBean) {
 }
 ```
 
-`CustomPaletteProvider` 会把默认 palette 中非白名单分组的条目统一归入 `default` 分组，而 `custom` 与 `custom-elements`（后端自定义元素，见"工具栏"一节）分组保持不变。
+`CustomPaletteProvider` 会把默认 palette 中非白名单分组的条目统一归入 `default` 分组，而 `custom` 分组保持不变（后端自定义元素现在由 Vue 面板 `CustomElementsPanel.vue` 渲染，见"自定义元素"一节）。
 
 **图标来源：**
 
@@ -362,6 +364,8 @@ function handleSaved(formBean) {
 ## 工具栏（Palette）
 
 使用 [diagram-js-accordion-palette](https://github.com/miyuesc/diagram-js-accordion-palette) 替换默认 palette，支持按分组折叠 / 展开。
+
+工具栏顶部的「收起」按钮与收起后左上角的「展开」手柄由 `PaletteToolbar.vue`（声明式组件）渲染，点击直接调用 palette 服务的 `open() / close()`，显隐交给 CSS 的 `.open` 类控制。
 
 **默认分组：**
 
@@ -404,7 +408,7 @@ accordionPalette: {
 
 ### 自定义元素（后端分页）
 
-`CustomElementsProvider` 会把后端接口返回的自定义元素渲染到 palette 中，支持**分页浏览**与**按名称搜索**，元素按 `item.group` 归类到不同分组。
+`CustomElementsPanel.vue` 会把后端接口返回的自定义元素渲染到 palette 中，支持**分页浏览**与**按名称搜索**，元素按 `item.group` 归类到不同分组。
 
 **数据契约：**
 
@@ -436,13 +440,18 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 | `iconClass` | 否 | 图标 CSS 类；不传时按 `type` 兜底映射内置图标 |
 | `options` | 否 | 创建元素时的额外属性（如 Camunda 扩展属性） |
 
-**交互与布局：**
+**交互与布局（声明式实现）：**
 
-- **搜索**：搜索框固定在分组区顶部；输入防抖 300ms 自动搜索、回车立即搜索；搜索结果从第 1 页开始，关键字保留在输入框内并保持焦点
-- **分页**：分页条固定在面板最底部；数据多于 1 页时显示 上一页 / 页码 / 下一页
-- **状态提示**：加载中、首载失败（可点击重试）、无匹配 / 暂无数据提示均为浮动消息
-- **独立于分组**：搜索框、状态提示、分页条都不属于任何手风琴分组，折叠 / 展开分组不会影响它们
-- **分组折叠状态保留**：搜索或翻页触发重建后，各分组的展开 / 折叠状态会按分组名恢复
+- **声明式渲染**：搜索框、状态提示、分组列表、分页条全部由 `CustomElementsPanel.vue` 模板渲染；数据源是 `reactive()` 包裹的 `CustomElementsStore`（getters 自动成为响应式派生值），状态变化由 Vue 自动驱动重渲染，无需任何手动 DOM 注入 / 重建
+- **搜索**：`v-model` + 300ms 防抖自动搜索、回车立即搜索；输入框由 Vue 管理，搜索后焦点与光标位置天然保留
+- **分页**：分页条位于面板最底部；数据多于 1 页时显示 上一页 / 页码 / 下一页，按钮可用态由 `hasPrev / hasNext / loading` 派生
+- **状态提示**：加载中、首载失败（可点击重试）、无匹配 / 暂无数据均为条件渲染（`v-if`）的浮动消息
+- **分组折叠状态保留**：分组 `<details>` 的展开 / 折叠状态保存在响应式 `Map` 中，搜索或翻页后按分组名自动恢复
+- **独立于分组**：搜索框、状态提示、分页条不属于任何手风琴分组，折叠 / 展开分组不会影响它们
+
+**架构说明：**
+
+`CustomElementsProvider` 把两个 Vue 应用（`CustomElementsPanel.vue` 与 `PaletteToolbar.vue`）挂载到 `.djs-palette` 容器内**持久存在的宿主节点**上。宿主节点是 `.djs-palette-entries` 的兄弟节点，不参与 layout（`display: contents`），因此不会随 diagram-js 的 `_update()` 清空重建，Vue 应用跨重建存活，状态与 DOM 均无需手动同步。`PaletteToolbar.vue` 负责工具栏的收起 / 展开（显隐由 CSS `.open` 类控制）。
 
 **接入真实后端：**
 
@@ -483,7 +492,7 @@ A: 编辑 `src/components/palette/CustomPaletteProvider.js`，在 `getPaletteEnt
 
 ### Q: 如何接入后端的自定义元素列表？
 
-A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider`，它会自动获得分页与搜索能力（详见"自定义元素"一节）。
+A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider` 与 `CustomElementsPanel.vue`，它们会自动获得分页与搜索能力（详见"自定义元素"一节）。
 
 ### Q: 如何修改工具栏图标？
 

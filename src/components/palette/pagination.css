@@ -1,3 +1,15 @@
+/* Vue 挂载宿主：不产生盒子，让子元素（工具栏/面板）直接参与 .djs-palette 的布局，
+   并作为 .djs-palette-entries 的兄弟节点，避免被 diagram-js 的 _update() 重建 */
+.djs-custom-elements-host {
+  display: contents;
+}
+
+/* palette 收起时隐藏整个自定义元素面板（与 .djs-palette-entries 的行为一致，
+   只保留收起手柄） */
+.djs-accordion-palette:not(.open) .djs-custom-elements-panel {
+  display: none;
+}
+
 /* 自定义元素的分页条样式（浮动在分组区底部，独立于 accordion 分组） */
 .djs-accordion-palette .djs-custom-elements-pager {
   display: flex;

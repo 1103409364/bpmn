@@ -25,8 +25,8 @@ export default class CustomPaletteProvider {
 
   /**
    * 返回一个 entries 更新器：
-   * 1. 把默认 provider 的条目统一归入 'default' 分组（'custom' / 'custom-elements'
-   *    分组保持不动，后者由 CustomElementsProvider 管理）
+   * 1. 把默认 provider 的条目统一归入 'default' 分组（'custom' 分组保持不动；
+   *    自定义元素现由 Vue 面板 CustomElementsPanel.vue 渲染，不再走 provider）
    * 2. 追加自定义条目（create.* 创建元素工具、custom.* 自定义动作）
    */
   getPaletteEntries() {
