@@ -257,11 +257,13 @@ function collectFlowNodes() {
  * 生成某个流程节点的默认 taskInfo 条目。
  */
 function defaultTaskInfoEntry(bo) {
+  console.log('生成默认 taskInfo 条目:', bo)
   const entry = {
     $type: bo.$type,
     id: bo.id,
     name: bo.name || '',
-    xxx: ''
+    xxx: '',
+    busId: bo.$attrs?.busId || '',
   }
   if (bo.$type === 'bpmn:UserTask') {
     entry.executeType = ''
@@ -558,6 +560,7 @@ async function save(extra = {}) {
     // 把保存结果合并进本地状态并记录快照，保证保存后 isDirty 立即为 false
     savedSnapshot.value = { ...formDataLocal.value }
     // emit('update:formData', bean)
+    console.log('保存数据:', formDataLocal.value.taskInfo)
     emit('saved')
   } catch (err) {
     console.error('保存失败:', err)

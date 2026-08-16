@@ -44,9 +44,11 @@ const TYPE_ICON_MAP = {
  *
  * 约定的接口返回结构（fetchPage prop）：
  *   fetchPage({ page, pageSize, keyword }) => Promise<{ list, total }>
- *   - list：当前页元素数组，元素结构约定为 { id, name, type, group?, iconClass?, options? }
+ *   - list：当前页元素数组，元素结构约定为 { id, name, type, group?, iconClass?, options?, businessData? }
  *   - total：总条数（用于计算总页数）
  *   - keyword：搜索关键字（名称模糊搜索），可为空字符串
+ *   - businessData：创建元素时写入 businessObject 的业务数据对象（可选，
+ *     示例字段 busId），见 handleCreate
  * 若后端字段不同，在传入 fetchPage 的调用方做一次适配映射即可。
  *
  * 默认 fetchPage 指向 src/api/customElements.js 的 mock 实现；接入真实后端时，
@@ -176,6 +178,22 @@ function handleCreate(event, item) {
   const shape = props.elementFactory.createShape(
     assign({ type: item.type || 'bpmn:Task' }, item.options)
   )
+
+  // 携带业务数据：把 item.businessData 写入 businessObject（示例字段 busId），
+  // 创建后可在属性面板 / 保存时从元素上读取。
+  //
+  // 注意：用 businessObject.set() 写入的字段在保存时会序列化到 XML（作为属性）。
+  // 若不想进 XML（仅内存生效），可改成直接赋值 businessObject.busId = ...，
+  // 但直接赋值不会被 moddle 追踪，复制/粘贴重建 businessObject 时会丢失。
+  const businessData = item.businessData
+  if (businessData && typeof businessData === 'object') {
+    const bo = shape.businessObject
+    bo.name = item.name || bo.name // 默认节点名称：name 是 BPMN 声明属性（bpmn:BaseElement），直接赋值即可，会正常序列化到 XML，画布上的标签显示的就是 businessObject.name。注意：不能把 name 塞进 createShape 的 attrs，那只落在 shape 上、进不了 businessObject。
+    Object.keys(businessData).forEach((key) => {
+      if (businessData[key] != null) bo.set(key, businessData[key])
+    })
+  }
+
   props.create.start(event, shape)
 }
 

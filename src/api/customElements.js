@@ -1,15 +1,16 @@
 // 自定义元素 API 适配层
 //
 // 约定：本层只负责把后端数据拉回来，并统一转换成
-//   { list: Array<{ id, name, type, group?, iconClass?, options? }>, total: number }
+//   { list: Array<{ id, name, type, group?, iconClass?, options?, businessData? }>, total: number }
 // 交给 palette 分页使用。
 // list 元素字段：
-//   id       唯一标识（必填）
-//   name     显示名称（必填）
-//   type     要创建的 BPMN 类型，如 'bpmn:UserTask'（必填）
-//   group    所属分组名，作为 palette 分组标题；缺省时归入 modeler 配置的 groupName（可选）
-//   iconClass 图标 CSS 类，不传则按 type 兜底映射到 bpmn-font 图标（可选）
-//   options  创建元素时的额外属性（可选，如 camunda 扩展属性）
+//   id           唯一标识（必填）
+//   name         显示名称（必填）
+//   type         要创建的 BPMN 类型，如 'bpmn:UserTask'（必填）
+//   group        所属分组名，作为 palette 分组标题；缺省时归入 modeler 配置的 groupName（可选）
+//   iconClass    图标 CSS 类，不传则按 type 兜底映射到 bpmn-font 图标（可选）
+//   options      创建元素时的额外属性（可选，如 camunda 扩展属性）
+//   businessData 业务数据对象，创建元素时写入 businessObject（可选，示例字段 busId）
 
 const MOCK_TOTAL = 25
 const MOCK_TYPES = [
@@ -37,7 +38,9 @@ function mockFetchCustomElements({ page, pageSize, keyword }) {
       id: 'ce-' + seq,
       name: MOCK_NAMES[i % MOCK_NAMES.length] + '任务' + seq,
       type,
-      group: MOCK_GROUPS[i % MOCK_GROUPS.length]
+      group: MOCK_GROUPS[i % MOCK_GROUPS.length],
+      // 示例业务数据：创建元素时会写入元素的 businessObject
+      businessData: { busId: 'BUS-' + seq }
     }
   })
 
@@ -66,7 +69,8 @@ function mockFetchCustomElements({ page, pageSize, keyword }) {
  *       name: r.name,
  *       type: r.type,
  *       group: r.category, // 后端分组字段名不一致时在此映射
- *       iconClass: r.iconClass
+ *       iconClass: r.iconClass,
+ *       businessData: { busId: r.busId } // 业务数据写入 businessObject
  *     })),
  *     total
  *   }

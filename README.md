@@ -441,6 +441,9 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 | `group` | 否 | 所属分组名（palette 分组标题），缺失时归入 `groupName` |
 | `iconClass` | 否 | 图标 CSS 类；不传时按 `type` 兜底映射内置图标 |
 | `options` | 否 | 创建元素时的额外属性（如 Camunda 扩展属性） |
+| `businessData` | 否 | 业务数据对象，创建元素时通过 `businessObject.set()` 逐字段写入（如 `{ busId: 'BUS-001' }`），保存时序列化到 XML |
+
+读取方式：`element.businessObject.busId`（字段名按需替换）。若只想内存生效、不写入 XML，可改为直接赋值 `businessObject.busId = ...`（moddle 不追踪，保存不进 XML），但复制/粘贴会重建 businessObject 导致该字段丢失。
 
 **交互与布局（声明式实现）：**
 
