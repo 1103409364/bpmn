@@ -241,41 +241,42 @@ async function initModeler() {
  *     调用 findUpstreamServiceTaskIds('B') 返回 ['A']（去重）
  */
 function findUpstreamServiceTaskIds(serviceTaskId) {
-  // elementRegistry：bpmn-js 的元素注册表，管理画布上所有元素（节点、连线、标签等），
-  // 本质是 id → element 的 Map，可通过 get(id) 按 id 查询，getAll() 获取全部元素
   const elementRegistry = modeler.get('elementRegistry')
-  // 画布元素在追溯过程中不会变化，只需取一次
   const allElements = elementRegistry.getAll()
-  // visited：防止同一节点被重复遍历（避免循环连线导致死循环）
+
+  // 预构建 targetId → SequenceFlow[] 映射，避免遍历时每次都扫描全部元素
+  const incomingFlowsMap = new Map()
+  allElements.forEach((el) => {
+    if (el.type !== 'bpmn:SequenceFlow') return
+    const targetId = el.businessObject.targetRef?.id
+    if (!targetId) return
+    if (!incomingFlowsMap.has(targetId)) {
+      incomingFlowsMap.set(targetId, [])
+    }
+    incomingFlowsMap.get(targetId).push(el)
+  })
+
   const visited = new Set()
-  // collected：收集结果，Set 自动去重（同一 ServiceTask 可通过多条路径到达）
   const collected = new Set()
 
   function traverse(elementId) {
     if (visited.has(elementId)) return
     visited.add(elementId)
 
-    // 筛选出 targetRef 指向当前元素的 SequenceFlow（即"指向我的连线"）
-    allElements.forEach((el) => {
-      if (el.type !== 'bpmn:SequenceFlow') return
-      if (el.businessObject.targetRef?.id !== elementId) return
-
-      // sourceRef：这条连线的起点元素
-      const sourceRef = el.businessObject.sourceRef
+    // 直接从 Map 获取指向当前元素的所有 SequenceFlow，O(1) 查找
+    const incomingFlows = incomingFlowsMap.get(elementId) || []
+    incomingFlows.forEach((flow) => {
+      const sourceRef = flow.businessObject.sourceRef
       if (!sourceRef) return
 
       if (sourceRef.$type === 'bpmn:ServiceTask') {
-        // 连线起点是 ServiceTask，直接收集
-        collected.add(sourceRef.id) // 可以收集其他东西例如自定义字段 xxxId
+        collected.add(sourceRef.id)
       } else if (sourceRef.$type === 'bpmn:ExclusiveGateway') {
-        // 连线起点是排他网关（菱形图标），说明上游可能有多条分支汇入网关，继续向上追溯
         traverse(sourceRef.id)
       }
-      // 其他类型（如 StartEvent、IntermediateEvent 等）不处理，该分支追溯结束
     })
   }
 
-  // 从目标 ServiceTask 开始反向遍历
   traverse(serviceTaskId)
   return [...collected]
 }
