@@ -203,6 +203,17 @@ async function initModeler() {
     if (newSelection && newSelection[0] && !isPreview.value) {
       panelVisible.value = true
     }
+
+    // 当选中 SequenceFlow 且 targetRef 是 ServiceTask 时，追溯上游连接的 ServiceTask
+    const selected = newSelection && newSelection[0]
+    if (selected?.type === 'bpmn:SequenceFlow') {
+      const targetRef = selected.businessObject?.targetRef
+      if (targetRef?.$type === 'bpmn:ServiceTask') {
+        const upstreamIds = findUpstreamServiceTaskIds(targetRef.id)
+        console.log('targetRef ServiceTask id:', targetRef.id)
+        console.log('上游连接的 ServiceTask ids:', upstreamIds)
+      }
+    }
   })
 
   // commandStack.changed：任何编辑操作（增删改、撤销/重做）发生后触发，
@@ -214,6 +225,59 @@ async function initModeler() {
 
   // modeler 初始化完成，通知 Vue 重渲染
   modelerReady.value = true
+}
+
+/**
+ * 向上追溯所有连接到指定 ServiceTask 的上游 ServiceTask id（含 ExclusiveGateway 间接连接）。
+ *
+ * BPMN 中 SequenceFlow（序列流）是有方向的连线，每个连线有 sourceRef（起点）和 targetRef（终点）。
+ * 本函数从给定的 ServiceTask 出发，沿 SequenceFlow 的反方向（target → source）递归搜索：
+ * - 遇到 ServiceTask：说明找到一个上游节点，收集其 id
+ * - 遇到 ExclusiveGateway（排他网关）：说明连线经过网关分叉/汇聚，继续沿网关的上游追溯
+ * - 其他类型节点（StartEvent、UserTask 等）：停止该方向的搜索
+ *
+ * 例：ServiceTask_A → ExclusiveGateway → ServiceTask_B
+ *     ServiceTask_A → ServiceTask_B（另一条直连线）
+ *     调用 findUpstreamServiceTaskIds('B') 返回 ['A']（去重）
+ */
+function findUpstreamServiceTaskIds(serviceTaskId) {
+  // elementRegistry：bpmn-js 的元素注册表，管理画布上所有元素（节点、连线、标签等），
+  // 本质是 id → element 的 Map，可通过 get(id) 按 id 查询，getAll() 获取全部元素
+  const elementRegistry = modeler.get('elementRegistry')
+  // 画布元素在追溯过程中不会变化，只需取一次
+  const allElements = elementRegistry.getAll()
+  // visited：防止同一节点被重复遍历（避免循环连线导致死循环）
+  const visited = new Set()
+  // collected：收集结果，Set 自动去重（同一 ServiceTask 可通过多条路径到达）
+  const collected = new Set()
+
+  function traverse(elementId) {
+    if (visited.has(elementId)) return
+    visited.add(elementId)
+
+    // 筛选出 targetRef 指向当前元素的 SequenceFlow（即"指向我的连线"）
+    allElements.forEach((el) => {
+      if (el.type !== 'bpmn:SequenceFlow') return
+      if (el.businessObject.targetRef?.id !== elementId) return
+
+      // sourceRef：这条连线的起点元素
+      const sourceRef = el.businessObject.sourceRef
+      if (!sourceRef) return
+
+      if (sourceRef.$type === 'bpmn:ServiceTask') {
+        // 连线起点是 ServiceTask，直接收集
+        collected.add(sourceRef.id) // 可以收集其他东西例如自定义字段 xxxId
+      } else if (sourceRef.$type === 'bpmn:ExclusiveGateway') {
+        // 连线起点是排他网关（菱形图标），说明上游可能有多条分支汇入网关，继续向上追溯
+        traverse(sourceRef.id)
+      }
+      // 其他类型（如 StartEvent、IntermediateEvent 等）不处理，该分支追溯结束
+    })
+  }
+
+  // 从目标 ServiceTask 开始反向遍历
+  traverse(serviceTaskId)
+  return [...collected]
 }
 
 /**
