@@ -241,18 +241,15 @@ async function initModeler() {
  *     调用 findUpstreamServiceTaskIds('B') 返回 ['A']（去重）
  */
 function findUpstreamServiceTaskIds(serviceTaskId) {
-  const elementRegistry = modeler.get('elementRegistry')
-  const allElements = elementRegistry.getAll()
+  const allElements = modeler.get('elementRegistry').getAll()
 
-  // 预构建 targetId → SequenceFlow[] 映射，避免遍历时每次都扫描全部元素
+  // 预构建 targetId → SequenceFlow[] 映射
   const incomingFlowsMap = new Map()
   allElements.forEach((el) => {
     if (el.type !== 'bpmn:SequenceFlow') return
     const targetId = el.businessObject.targetRef?.id
     if (!targetId) return
-    if (!incomingFlowsMap.has(targetId)) {
-      incomingFlowsMap.set(targetId, [])
-    }
+    if (!incomingFlowsMap.has(targetId)) incomingFlowsMap.set(targetId, [])
     incomingFlowsMap.get(targetId).push(el)
   })
 
@@ -262,19 +259,15 @@ function findUpstreamServiceTaskIds(serviceTaskId) {
   function traverse(elementId) {
     if (visited.has(elementId)) return
     visited.add(elementId)
-
     // 直接从 Map 获取指向当前元素的所有 SequenceFlow，O(1) 查找
-    const incomingFlows = incomingFlowsMap.get(elementId) || []
-    incomingFlows.forEach((flow) => {
+    for (const flow of incomingFlowsMap.get(elementId) || []) {
       const sourceRef = flow.businessObject.sourceRef
-      if (!sourceRef) return
-
-      if (sourceRef.$type === 'bpmn:ServiceTask') {
+      if (sourceRef?.$type === 'bpmn:ServiceTask') {
         collected.add(sourceRef.id)
-      } else if (sourceRef.$type === 'bpmn:ExclusiveGateway') {
+      } else if (sourceRef?.$type === 'bpmn:ExclusiveGateway') {
         traverse(sourceRef.id)
       }
-    })
+    }
   }
 
   traverse(serviceTaskId)
