@@ -151,6 +151,8 @@ async function initModeler() {
   const { translateModule } = await import('./i18n/index')
   // 默认名称行为模块：新建 bpmn:StartEvent 时自动写入默认 name
   const { defaultCreateBehaviorModule } = await import('./behavior/index')
+  // 自定义渲染模块：接管画布元素标签的展示内容（如 ServiceTask 图标内展示 busId）
+  const { customRendererModule } = await import('./renderer/index')
   // 手风琴折叠式 palette 模块：替换默认的 palette 服务，按分组折叠/展开
   const { default: accordionPaletteModule } = await import('diagram-js-accordion-palette')
   // 视觉网格模块：在画布上显示点状网格（SVG 实现，无需引入样式）
@@ -167,7 +169,8 @@ async function initModeler() {
       translateModule,
       accordionPaletteModule,
       gridModule,
-      defaultCreateBehaviorModule
+      defaultCreateBehaviorModule,
+      customRendererModule
     ],
     // accordionPalette: 手风琴 palette 的配置
     accordionPalette: {
@@ -498,7 +501,9 @@ async function enterPreview() {
 
     if (previewViewer) previewViewer.destroy()
     const { default: BpmnViewer } = await import('bpmn-js/lib/NavigatedViewer')
-    previewViewer = new BpmnViewer({ container: previewEl })
+    // 预览层挂载与编辑态一致的自定义渲染模块，保证标签展示内容相同（模块会被缓存，无重复加载开销）
+    const { customRendererModule } = await import('./renderer/index')
+    previewViewer = new BpmnViewer({ container: previewEl, additionalModules: [customRendererModule] })
     await previewViewer.importXML(xml)
 
     // 同步预览层选中到 activeElement，让只读属性面板能跟随点击展示对应节点属性
