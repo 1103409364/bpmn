@@ -1,11 +1,11 @@
 <template>
-  <div class="tree-page">
-    <h1>Tree</h1>
+  <div class="logic-tree-page">
+    <h1>LogicTree</h1>
   </div>
 </template>
 
 <style scoped>
-.tree-page {
+.logic-tree-page {
   height: 100%;
 }
 </style>

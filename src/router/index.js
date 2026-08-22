@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import BpmnApp from '../views/BpmnApp.vue'
-import Tree from '../views/Tree.vue'
+import LogicTree from '../views/LogicTree.vue'
 
 const routes = [
   { path: '/', redirect: '/bpmn' },
@@ -10,9 +10,9 @@ const routes = [
     component: BpmnApp
   },
   {
-    path: '/tree',
-    name: 'Tree',
-    component: Tree
+    path: '/logic-tree',
+    name: 'LogicTree',
+    component: LogicTree
   }
 ]
 
