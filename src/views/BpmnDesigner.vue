@@ -28,19 +28,19 @@ function onSaved() {
 
 // 模拟异步加载：组件挂载后通过定时器模拟从后端获取数据并调用子组件的 loadFormData
 onMounted(() => {
-  setTimeout(() => {
-    const asyncData = {
-      workflowCode: 'ASYNC',
-      workflowName: '异步加载流程示例',
-      workflowType: 'W',
-      publishedFlag: '1',
-      bpmn: testXml,
-      taskInfo: []
-    }
-    // loadFormData 触发 v-model:form-data 的更新，taskInfo 计算属性 set 触发
-     modelerRef.value?.loadFormData(asyncData)
-    showToast('异步加载完成')
-  }, 2500)
+  // setTimeout(() => {
+  //   const asyncData = {
+  //     workflowCode: 'ASYNC',
+  //     workflowName: '异步加载流程示例',
+  //     workflowType: 'W',
+  //     publishedFlag: '1',
+  //     bpmn: testXml,
+  //     taskInfo: []
+  //   }
+  //   // loadFormData 触发 v-model:form-data 的更新，taskInfo 计算属性 set 触发
+  //    modelerRef.value?.loadFormData(asyncData)
+  //   showToast('异步加载完成')
+  // }, 2500)
 })
 </script>
 
