@@ -134,8 +134,6 @@ async function applyFormData(newFormData) {
     await importDiagram(formDataLocal.value.bpmn)
   }
 
-  // 根据画布元素初始化 taskInfo
-  syncTaskInfo()
   // 把实际加载的画布状态序列化进 formDataLocal
   await refreshCanvasState()
 
