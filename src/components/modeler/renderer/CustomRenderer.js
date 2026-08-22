@@ -81,7 +81,7 @@ export default class CustomRenderer extends BaseRenderer {
       if (is(bo, 'bpmn:ServiceTask')) {
         // 示例一：SVG 徽标（画布本身就是 SVG，可追加任意 SVG 节点，
         // 坐标系为元素本地坐标，(0,0) 即形状左上角；随画布缩放平移）
-        this._drawSvgBadge(parentGfx)
+        this._drawSvgBadge(parentGfx, element)
 
         // 示例二：foreignObject 内嵌 HTML+CSS（宽高必填；
         // 内容缩放跟随画布，样式走 index.vue 非 scoped 全局块）
@@ -95,30 +95,52 @@ export default class CustomRenderer extends BaseRenderer {
   }
 
   /**
-   * 示例一：ServiceTask 左上角画一枚绿色圆形徽标（circle + text）
+   * 示例一：ServiceTask 右上角画一枚徽标（圆角矩形 + busId 文本）。
+   * 宽度按文本长度自适应，超长截断（底部 foreignObject 徽签仍显示完整值）。
    */
-  _drawSvgBadge(parentGfx) {
-    const badge = svgCreate('circle', {
-      cx: 12,
-      cy: 12,
-      r: 9,
+  _drawSvgBadge(parentGfx, element) {
+    const bo = element.businessObject
+    const busId = (bo.$attrs && bo.$attrs.busId) || ''
+
+    const MAX_CHARS = 8
+    const text = busId.length > MAX_CHARS
+      ? `${busId.slice(0, MAX_CHARS)}…`
+      : (busId || '无 busId')
+
+    const fontSize = 10
+    const height = 14
+    const margin = 5
+    const paddingX = 6
+    // 文本宽度粗估：ASCII 约 0.6 倍字号，中文约 1 倍，取两者混合的保守值
+    const textWidth = [...text].reduce(
+      (w, ch) => w + (ch.charCodeAt(0) > 255 ? fontSize : fontSize * 0.6),
+      0
+    )
+    const width = Math.ceil(textWidth) + paddingX * 2
+
+    const rect = svgCreate('rect', {
+      x: element.width - width - margin,
+      y: margin,
+      width,
+      height,
+      rx: height / 2,
       fill: '#10b981',
       stroke: '#fff',
-      'stroke-width': 1.5
+      'stroke-width': 1.2
     })
 
     const label = svgCreate('text', {
-      x: 12,
-      y: 12,
+      x: element.width - margin - width / 2,
+      y: margin + height / 2,
       fill: '#fff',
-      'font-size': 11,
+      'font-size': fontSize,
       'font-weight': 'bold',
       'text-anchor': 'middle',
       'dominant-baseline': 'central'
     })
-    label.textContent = 'S'
+    label.textContent = text
 
-    svgAppend(parentGfx, badge)
+    svgAppend(parentGfx, rect)
     svgAppend(parentGfx, label)
   }
 
