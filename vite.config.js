@@ -9,7 +9,11 @@ export default defineConfig({
   // 配合 `?raw` 后缀即可在 JS 里直接拿到流程 XML 字符串（见 BpmnModeler.vue 中的导入）。
   // 若不配置，import xx.bpmn 会被当作普通模块解析而导致报错。
   assetsInclude: ['**/*.bpmn'],
-  worker: {
-    format: 'es'
-  }
+  worker: { format: 'es' },
+  // 配置 @ 符号为 src 目录的别名，方便导入模块
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
 })

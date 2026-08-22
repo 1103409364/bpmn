@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import LogicConditionTree from '../components/logictree/LogicConditionTree.vue'
+import LogicConditionTree from '@/components/logic-tree/index.vue'
 
 // 根节点固定为 GROUP 且不可删除；组与条件可任意嵌套
 const tree = ref({
