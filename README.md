@@ -689,7 +689,7 @@ data property on the proxy target but the proxy did not return its actual value
 
 ### 3. 属性面板采用单向数据流
 
-PropertyPanel 输入框用 `:value` + `@input` 绑定，通过 `change` 事件把 `{ key, value }` 抛给父组件，由父组件更新 taskInfo。**不要在子组件内直接修改 `props.taskInfo`**，否则会破坏"唯一数据源"约束。
+PropertyPanel 输入框用 `:value` + `@input` 绑定，通过 `taskInfoChange` 事件把 `{ key, value }` 抛给父组件，由父组件更新 taskInfo；基础信息改动则通过 `baseInfoChange` 事件抛出 `{ [key]: value }` 补丁。**不要在子组件内直接修改 `props.taskInfo` / `props.formData`**，否则会破坏"唯一数据源"约束。
 
 ### 4. 多选元素只取第一个
 

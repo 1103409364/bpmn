@@ -3,7 +3,8 @@ import { computed } from 'vue'
 
 // 属性编辑器组件：合并了基础信息与节点属性编辑。
 // 选中流程节点时展示并编辑该节点的 taskInfo 条目；未选中时展示并编辑流程表单元数据。
-// 基础信息通过 v-model:form-data 双向绑定；节点属性通过 change 事件抛给父组件（父组件负责同步 taskInfo 与画布）。
+// 单向数据流：节点属性通过 taskInfoChange 事件、基础信息通过 baseInfoChange 事件把改动抛给父组件
+// （父组件负责同步 taskInfo / formData 与画布），子组件不直接修改任何 props。
 const props = defineProps({
   // 当前选中的 bpmn-js 元素；为空表示未选中，展示基础信息
   element: {
@@ -15,7 +16,7 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  // 流程表单元数据（未选中节点时编辑），支持 v-model:form-data 双向绑定
+  // 流程表单元数据（未选中节点时编辑），改动通过 baseInfoChange 事件抛给父组件
   formData: {
     type: Object,
     default: () => ({})
@@ -32,7 +33,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['change', 'update:formData', 'close', 'expand'])
+const emit = defineEmits(['taskInfoChange', 'baseInfoChange', 'close', 'expand'])
 
 // 类型展示名（去掉 bpmn: 前缀）
 const typeName = computed(() => (props.element?.businessObject?.$type || '').replace('bpmn:', ''))
@@ -78,11 +79,11 @@ const TASK_FIELDS = {
 const taskFields = computed(() => TASK_FIELDS[entry.value?.$type] || [{ key: 'name', label: '节点名称' }])
 
 function updateField(key, value) {
-  emit('change', { key, value })
+  emit('taskInfoChange', { key, value })
 }
 
 function updateFormField(key, value) {
-  emit('update:formData', { ...props.formData, [key]: value })
+  emit('baseInfoChange', { [key]: value })
 }
 </script>
 

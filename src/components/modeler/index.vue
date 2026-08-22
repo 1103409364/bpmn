@@ -32,12 +32,6 @@ const canvasRef = ref(null)
 // 本地 formData 副本：右侧基础信息编辑器直接修改它，改动后同步回父组件
 const formDataLocal = ref({ ...props.formData })
 
-// v-model 透传桥：setter 里既更新本地副本又 emit 给父组件，使 PropertyPanel 的 v-model:form-data 改动一路同步到最外层
-const formDataModel = computed({
-  get: () => formDataLocal.value,
-  set: (val) => updateFormDataLocal(val)
-})
-
 // 节点属性数据源（数组，唯一数据源）
 const taskInfo = computed({
   get: () => parseTaskInfo(),
@@ -410,7 +404,7 @@ async function refreshCanvasState() {
 }
 
 /**
- * 属性面板 change 事件处理：更新 taskInfo。
+ * 属性面板 taskInfoChange 事件处理：更新 taskInfo。
  * name 是标准 BPMN 属性，同步回 businessObject 更新节点标签并随 XML 保存；
  * 其余自定义属性仅存于内存 taskInfo，不写入 XML
  */
@@ -701,10 +695,11 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
         v-if="modelerReady"
         :element="activeElement"
         :task-info="taskInfo"
-        v-model:form-data="formDataModel"
+        :form-data="formDataLocal"
         :collapsed="!panelVisible"
         :readonly="isPreview"
-        @change="onTaskInfoChange"
+        @taskInfoChange="onTaskInfoChange"
+        @baseInfoChange="updateFormDataLocal"
         @close="panelVisible = false"
         @expand="panelVisible = true"
       />
