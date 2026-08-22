@@ -1,0 +1,106 @@
+.lct-group {
+  min-width: 320px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.lct-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lct-operator {
+  padding: 2px 10px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+}
+
+.lct-count {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.lct-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.lct-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.lct-btn:hover {
+  background: #f3f4f6;
+}
+
+.lct-btn-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.lct-btn-danger:hover {
+  background: #fef2f2;
+}
+
+.lct-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 10px;
+  padding-left: 14px;
+  border-left: 2px dashed #d1d5db;
+}
+
+.lct-empty {
+  padding: 4px 0 4px 16px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.lct-condition {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-width: 320px;
+  padding: 4px 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.lct-input {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+}
+
+.lct-input:focus {
+  border-color: #2563eb;
+}
+
+.lct-field {
+  width: 140px;
+}
+
+.lct-value {
+  width: 120px;
+}
