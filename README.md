@@ -42,6 +42,9 @@ bpmn/
         ├── behavior/
         │   ├── index.js                     # 默认创建行为模块（DI 定义）
         │   └── DefaultCreateBehavior.js     # 新建元素时写入默认属性（如 StartEvent 默认名）
+        ├── renderer/
+        │   ├── index.js                     # 自定义渲染模块（DI 定义）
+        │   └── CustomRenderer.js            # 自定义画布元素标签展示内容（含 SVG / foreignObject / overlays 示例）
         ├── palette/
         │   ├── index.js                   # 自定义 palette 模块（DI 定义）
         │   ├── CustomPaletteProvider.js   # 扩展默认工具栏的自定义条目
@@ -397,6 +400,52 @@ this.preExecute('shape.create', (event) => {
 - 只在属性为空时写入，不覆盖已命名 / 已导入的流程（`importXML` 不走 `shape.create` 命令，不会触发本行为）
 - 直接给 `businessObject` 赋值写入的是标准 BPMN 属性（如 `name`），会随 `saveXML` 序列化到 XML；扩展属性需用 `businessObject.set(key, value)` 才能被 moddle 追踪并序列化
 
+### 自定义元素渲染（CustomRenderer）
+
+`src/components/modeler/renderer/CustomRenderer.js` 自定义**画布上元素的展示内容**：默认情况下图形内文字直接取 `businessObject.name`，本模块可改为任意规则（如 ServiceTask 图标内展示 `name(busId)`），并演示了三种视觉扩展方式（SVG / HTML / 交互层）。编辑态与只读预览的 `NavigatedViewer` 都挂载了该模块，两边展示一致。
+
+**原理：**
+
+bpmn-js 的内嵌标签（Task / ServiceTask / SubProcess 等图形内部文字）由 `BpmnRenderer.renderEmbeddedLabel` 在绘制时直接读取 `businessObject.name`，没有开放的"标签内容"钩子；事件、网关、连线等外置标签则走 `util/LabelUtil#getLabel`。因此标准做法是注册一个比默认 `BpmnRenderer`（priority=1000）优先级更高的自定义 Renderer（class 语法 + 静态 `$inject`），在绘制阶段接管：
+
+- `canRender(element)` 返回 true 的元素由本类绘制，其余回落默认渲染器
+- `drawShape` 中临时把 `businessObject.name` 替换为自定义文字，委托默认渲染器完成完整绘制（圆角矩形 + 图标 + 文字排版），绘完立即还原——不复制任何原生绘制代码
+
+**自定义展示规则：**
+
+修改 `getDisplayText(element)` 即可，返回 `null` 表示"不干预"（按默认 name 展示）：
+
+```javascript
+function getDisplayText(element) {
+  const bo = element.businessObject
+  if (!bo || element.type === 'label') return null
+
+  // 示例：ServiceTask 图标内展示 "name(busId)"，busId 取自 $attrs 扩展属性
+  if (is(bo, 'bpmn:ServiceTask')) {
+    const busId = bo.$attrs && bo.$attrs.busId
+    return busId ? `${bo.name || ''}(${busId})` : (bo.name || '')
+  }
+
+  return null
+}
+```
+
+**三种视觉扩展示例（均在 drawShape / 构造函数中）：**
+
+| 方式 | 实现位置 | 适用场景 | 关键约束 |
+| --- | --- | --- | --- |
+| SVG 追加节点 | `_drawSvgBadge()` | 徽标、图标、装饰线等矢量内容 | 画布本身是 SVG；坐标为元素本地坐标（`(0,0)` = 形状左上角），随画布缩放平移 |
+| `<foreignObject>` 内嵌 HTML+CSS | `_drawHtmlChip()` | 富文本徽签、复杂布局的纯展示内容 | 宽高必填；文本须转义防 XSS；收不到鼠标事件；样式写非 scoped 全局块 |
+| overlays 服务 | `_updateOverlay()` | 操作按钮、tooltip 等**可交互** HTML | 位于交互层之上可正常点击；自动跟随元素移动/缩放；监听 `selection.changed` 挂载、按 overlay id 清理 |
+
+**注意事项：**
+
+- 双击直接编辑仍读写标准 `name` 属性，展示与编辑是分离的；改 name 后画布自动重绘出新展示内容
+- 重绘安全：diagram-js 每次重绘前会清空 visual 容器再触发渲染，追加的 SVG/HTML 不会累积残留
+- `canRender` 命中的元素会同时拦截路径计算事件（连线端点定位、命中检测依赖它），必须把 `getShapePath` / `getConnectionPath` 委托回默认实现
+- tiny-svg 的导出名是 `create` / `append`（`svgCreate` / `svgAppend` 是 bpmn-js 内部源码的重命名写法）
+- 徽签与按钮样式 `.task-chip` / `.task-overlay-actions` 在 `index.vue` 非 scoped 样式块中（动态 DOM 不在 Vue 模板内）
+
 ## 工具栏（Palette）
 
 使用 [diagram-js-accordion-palette](https://github.com/miyuesc/diagram-js-accordion-palette) 替换默认 palette，支持按分组折叠 / 展开。
@@ -551,6 +600,10 @@ A: 编辑 `src/components/palette/CustomPaletteProvider.js`，在 `getPaletteEnt
 
 A: 在 `src/api/customElements.js` 中把 `fetchCustomElements` 换成真实接口，返回 `{ list, total }`（字段不一致时做映射）。无需改动 `CustomElementsProvider`，由于 `CustomElementsPanel.vue` 的 `fetchPage` 默认值直接引用该函数，替换后自动生效（详见"自定义元素"一节）。
 
+### Q: 如何自定义节点在画布上显示的文字（不显示 name）？
+
+A: 编辑 `src/components/modeler/renderer/CustomRenderer.js` 的 `getDisplayText(element)`，按元素类型返回要展示的内容，返回 `null` 回落默认。该模块还演示了 SVG 徽标、foreignObject 内嵌 HTML、overlays 交互按钮三种视觉扩展方式（详见"自定义元素渲染"一节）。
+
 ### Q: 如何修改工具栏图标？
 
 A: 通过 `createAction` 函数的第三个参数 `className` 修改，支持 bpmn-js 内置图标类、自定义 CSS 类或 Font Icon。
@@ -579,7 +632,7 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 
 ### 依赖注入架构
 
-bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、contextPadModule、translateModule、defaultCreateBehaviorModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
+bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、contextPadModule、translateModule、defaultCreateBehaviorModule、customRendererModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
 
 ### 非 Vue 组件接入 Vue 的重构技巧（palette 实战）
 

@@ -742,6 +742,43 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   display: none;
 } */
 
+/* ---------- 自定义渲染示例：foreignObject 内嵌 HTML 与 overlays 交互层 ---------- */
+/* 动态 DOM 不在 Vue 模板内，样式必须放在非 scoped 块 */
+
+/* 示例二：ServiceTask 底部的 busId 徽签（foreignObject 内的 div） */
+.task-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 1;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  border-radius: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* 示例三：overlays 挂载的交互按钮（位于交互层之上，可正常点击） */
+.task-overlay-actions button {
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 18px;
+  color: #065f46;
+  background: #fff;
+  border: 1px solid #10b981;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.task-overlay-actions button:hover {
+  background: #ecfdf5;
+}
+
 /* ---------- 只读预览覆盖层 ---------- */
 /* 覆盖整个画布，遮住 palette、网格与下层可编辑 modeler，
    bpmn-js 的 DOM 是动态注入的，样式需放在非 scoped 块中 */
