@@ -155,6 +155,7 @@ export default class CustomRenderer extends BaseRenderer {
     // 文字居中：锚点直接取矩形中心点 (rect.x + width/2, rect.y + height/2)，
     // 配合 text-anchor="middle"（水平居中于锚点）
     // 与 dominant-baseline="central"（垂直居中于锚点），无需手动计算文字包围盒偏移
+    // 左下角 x = margin + width / 2，y = element.height - margin - height / 2
     const label = svgCreate('text', {
       x: element.width - margin - width / 2,
       y: margin + height / 2,
