@@ -97,6 +97,22 @@ export default class CustomRenderer extends BaseRenderer {
   /**
    * 示例一：ServiceTask 右上角画一枚徽标（圆角矩形 + busId 文本）。
    * 宽度按文本长度自适应，超长截断（底部 foreignObject 徽签仍显示完整值）。
+   *
+   * 坐标系：parentGfx 是元素专属的 <g class="djs-visual">，使用"元素本地坐标"——
+   * 原点 (0,0) 固定在形状左上角，x 向右、y 向下，单位与画布一致；
+   * 画布缩放/平移由外层 viewport 变换统一处理，这里无需感知。
+   * 每次重绘 diagram-js 会先清空该容器再触发渲染，因此追加内容不会残留累积。
+   *
+   * 位置计算示意（margin = 徽标到形状右/上边缘的间距）：
+   *
+   *   (0,0)
+   *    ┌────────────────────────────────┐
+   *    │                 ┌──────────┐ ▲
+   *    │   ServiceTask   │ BUS-001  │ margin
+   *    │                 └──────────┘ ▼
+   *    │              ◄── width ──►│
+   *    │                        margin
+   *    └────────────────────────────────┘
    */
   _drawSvgBadge(parentGfx, element) {
     const bo = element.businessObject
@@ -107,17 +123,24 @@ export default class CustomRenderer extends BaseRenderer {
       ? `${busId.slice(0, MAX_CHARS)}…`
       : (busId || '无 busId')
 
+    // 尺寸参数：fontSize 文本字号；height 徽标高度；margin 距右上角边缘的间距；
+    // paddingX 文本左右内边距（保证文字与胶囊两端留白对称）
     const fontSize = 10
     const height = 14
     const margin = 5
     const paddingX = 6
-    // 文本宽度粗估：ASCII 约 0.6 倍字号，中文约 1 倍，取两者混合的保守值
+
+    // 宽度自适应：无法提前得知真实渲染宽度，逐字符粗估 ——
+    // 全角字符（中文等，charCode > 255）按 1 倍字号、ASCII 按 0.6 倍字号累加，
+    // 再加左右各 paddingX 内边距并向上取整，得到胶囊总宽
     const textWidth = [...text].reduce(
       (w, ch) => w + (ch.charCodeAt(0) > 255 ? fontSize : fontSize * 0.6),
       0
     )
     const width = Math.ceil(textWidth) + paddingX * 2
 
+    // 右上角对齐：x = 形状宽 - 徽标宽 - margin（徽标右缘距形状右缘 margin），
+    // y = margin（徽标顶缘距形状顶缘 margin）；rx 取半高即为完整胶囊圆角
     const rect = svgCreate('rect', {
       x: element.width - width - margin,
       y: margin,
@@ -129,6 +152,9 @@ export default class CustomRenderer extends BaseRenderer {
       'stroke-width': 1.2
     })
 
+    // 文字居中：锚点直接取矩形中心点 (rect.x + width/2, rect.y + height/2)，
+    // 配合 text-anchor="middle"（水平居中于锚点）
+    // 与 dominant-baseline="central"（垂直居中于锚点），无需手动计算文字包围盒偏移
     const label = svgCreate('text', {
       x: element.width - margin - width / 2,
       y: margin + height / 2,
