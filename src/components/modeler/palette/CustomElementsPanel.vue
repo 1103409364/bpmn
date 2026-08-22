@@ -2,7 +2,7 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { assign } from 'min-dash'
 
-import { fetchCustomElements } from '../../api/customElements'
+import { fetchCustomElements } from '../../../api/customElements'
 
 // BPMN 元素类型 -> 内置图标类名 的兜底映射（item.iconClass 未提供时使用）
 const TYPE_ICON_MAP = {
