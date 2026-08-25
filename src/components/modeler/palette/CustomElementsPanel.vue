@@ -177,8 +177,12 @@ function reload() {
 // ---------- 创建元素 ----------
 function handleCreate(event, item) {
   const shape = props.elementFactory.createShape(
-    assign({ type: item.type || 'bpmn:Task' }, item.options)
+    assign({
+      type: item.type || 'bpmn:Task',
+      // id: item.id // 自定义 id
+    }, item.options)
   )
+  // bo.set('id', item.id) // 自定义 id，写入 businessObject.id，便于在属性面板 / 保存时读取
 
   // 携带业务数据：把 item.businessData 写入 businessObject（示例字段 busId），
   // 创建后可在属性面板 / 保存时从元素上读取。
@@ -220,77 +224,42 @@ onBeforeUnmount(() => {
 
     <!-- 搜索框：固定在分组区顶部 -->
     <div class="djs-custom-elements-search">
-      <input
-        class="djs-custom-elements-search-input"
-        type="text"
-        v-model="keyword"
-        :placeholder="t('搜索自定义元素')"
-        :aria-label="t('搜索自定义元素')"
-        autocomplete="off"
-        @keydown.enter.prevent="applySearch"
-      />
+      <input class="djs-custom-elements-search-input" type="text" v-model="keyword" :placeholder="t('搜索自定义元素')"
+        :aria-label="t('搜索自定义元素')" autocomplete="off" @keydown.enter.prevent="applySearch" />
     </div>
 
     <!-- 首载失败重试：位于搜索框与分组之间 -->
-    <div
-      v-if="status && status.mode === 'retry'"
-      class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-retry"
-      @click="reload"
-    >
+    <div v-if="status && status.mode === 'retry'"
+      class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-retry" @click="reload">
       {{ t(status.text) }}
     </div>
 
     <!-- 当前页自定义元素分组 -->
-    <details
-      v-for="group in grouped"
-      :key="group.name"
-      class="djs-accordion-group"
-      :open="isGroupOpen(group.name)"
-      @toggle="onToggleGroup(group.name, $event)"
-    >
+    <details v-for="group in grouped" :key="group.name" class="djs-accordion-group" :open="isGroupOpen(group.name)"
+      @toggle="onToggleGroup(group.name, $event)">
       <summary>{{ t(group.name) }}</summary>
       <div class="djs-palette-group">
-        <div
-          v-for="(item, index) in group.items"
-          :key="item.id || index"
-          class="entry"
-          draggable="true"
+        <div v-for="(item, index) in group.items" :key="item.id || index" class="entry" draggable="true"
           :class="item.iconClass || TYPE_ICON_MAP[item.type] || 'bpmn-icon-task'"
-          :title="t(item.name || item.id || item.type)"
-          @click="(event) => handleCreate(event, item)"
-          @dragstart="(event) => handleCreate(event, item)"
-        ></div>
+          :title="t(item.name || item.id || item.type)" @click="(event) => handleCreate(event, item)"
+          @dragstart="(event) => handleCreate(event, item)"></div>
       </div>
     </details>
 
     <!-- 空结果提示：面板底部、分页条上方 -->
-    <div
-      v-if="status && status.mode === 'empty'"
-      class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-empty"
-    >
+    <div v-if="status && status.mode === 'empty'"
+      class="djs-custom-elements-float djs-custom-elements-status djs-custom-elements-status-empty">
       {{ t(status.text) }}
     </div>
 
     <!-- 分页条：面板最底部 -->
-    <div
-      v-if="initialized && !error && (totalPages > 1 || !items.length)"
-      class="djs-custom-elements-float djs-custom-elements-pager"
-    >
-      <button
-        type="button"
-        class="djs-pager-btn djs-pager-prev"
-        :disabled="!hasPrev || loading"
-        aria-label="上一页"
-        @click="prev"
-      >&lsaquo;</button>
+    <div v-if="initialized && !error && (totalPages > 1 || !items.length)"
+      class="djs-custom-elements-float djs-custom-elements-pager">
+      <button type="button" class="djs-pager-btn djs-pager-prev" :disabled="!hasPrev || loading" aria-label="上一页"
+        @click="prev">&lsaquo;</button>
       <span class="djs-pager-info">{{ page }} / {{ totalPages }}</span>
-      <button
-        type="button"
-        class="djs-pager-btn djs-pager-next"
-        :disabled="!hasNext || loading"
-        aria-label="下一页"
-        @click="next"
-      >&rsaquo;</button>
+      <button type="button" class="djs-pager-btn djs-pager-next" :disabled="!hasNext || loading" aria-label="下一页"
+        @click="next">&rsaquo;</button>
     </div>
   </div>
 </template>
