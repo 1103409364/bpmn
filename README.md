@@ -6,9 +6,10 @@
 
 - [Vue 3](https://vuejs.org/) + `<script setup>` 语法
 - [Vite](https://vite.dev/) 构建工具
+- [vue-router](https://router.vuejs.org/) 路由（hash 模式）
 - [bpmn-js](https://bpmn.io/toolkit/bpmn-js/) BPMN 2.0 渲染与建模
 - [bpmn-js-properties-panel](https://github.com/bpmn-io/bpmn-js-properties-panel) 元素属性面板
-- [camunda-bpmn-moddle](https://github.com/camunda/camunda-bpmn-moddle) Camunda 扩展模型定义
+- [bpmn-auto-layout](https://github.com/bpmn-io/bpmn-auto-layout) 流程自动排版
 - [diagram-js-accordion-palette](https://github.com/miyuesc/diagram-js-accordion-palette) 可折叠展开的左侧工具栏
 - [bpmn-js-i18n-zh](https://github.com/miyuesc/bpmn-js-i18n-zh) bpmn-js 中文本地化资源
 - [diagram-js-grid](https://github.com/bpmn-io/diagram-js-grid) 画布网格显示
@@ -28,40 +29,53 @@ npm run preview   # 预览生产构建
 bpmn/
 ├── index.html                     # 入口 HTML
 ├── package.json
-├── vite.config.js                 # Vite 配置（含 .bpmn 文件 raw 导入支持）
+├── vite.config.js                 # Vite 配置（.bpmn raw 导入、@ 别名）
 └── src/
-    ├── main.js                    # 应用入口
-    ├── App.vue                    # 主页面：加载流程、保存提示、toast 通知
-    ├── assets/
-    │   └── bpmn/
-    │       └── initial.bpmn       # 示例流程 XML（请假审批流程）
-    └── components/
-        ├── BpmnModeler.vue        # 核心流程设计器组件
-        ├── properties/
-        │   └── PropertyPanel.vue   # 元素属性编辑面板
-        ├── behavior/
-        │   ├── index.js                     # 默认创建行为模块（DI 定义）
-        │   └── DefaultCreateBehavior.js     # 新建元素时写入默认属性（如 StartEvent 默认名）
-        ├── renderer/
-        │   ├── index.js                     # 自定义渲染模块（DI 定义）
-        │   └── CustomRenderer.js            # 自定义画布元素标签展示内容（含 SVG / foreignObject / overlays 示例）
-        ├── palette/
-        │   ├── index.js                   # 自定义 palette 模块（DI 定义）
-        │   ├── CustomPaletteProvider.js   # 扩展默认工具栏的自定义条目
-        │   ├── CustomElementsProvider.js  # 自定义元素引导模块（挂载 Vue 面板到持久宿主）
-        │   ├── CustomElementsPanel.vue    # 自定义元素面板（声明式：接口请求 / 搜索 / 分组 / 分页）
-        │   ├── PaletteToolbar.vue         # 工具栏收起 / 展开（声明式）
-        │   └── pagination.css             # 分页条 / 搜索框 / 状态提示样式
-        ├── api/
-        │   └── customElements.js  # 自定义元素 API 适配层（含 mock 示例）
-        └── i18n/
-            ├── index.js           # translate 模块（DI 定义）
-            └── customTranslate.js # 中文翻译资源合并与覆盖
+    ├── main.js                    # 应用入口（创建 Vue 应用、挂载路由）
+    ├── App.vue                    # 仅含 <router-view /> 的根组件
+    ├── router/
+    │   └── index.js               # 路由（hash 历史）：/ → /bpmn，/bpmn，/logic-tree
+    ├── views/
+    │   ├── BpmnDesigner.vue       # BPMN 设计器页壳：持有 formBean，渲染 modeler
+    │   └── LogicTree.vue          # 逻辑条件树页：演示 LogicConditionTree 组件
+    ├── components/
+    │   ├── modeler/               # 核心流程设计器（BpmnModeler 组件）
+    │   │   ├── index.vue          # 设计器主组件（默认导出）
+    │   │   ├── palette/           # 手风琴 palette + provider + Vue 自定义元素面板
+    │   │   │   ├── index.js                  # palette 模块（DI 定义）
+    │   │   │   ├── CustomPaletteProvider.js  # 扩展默认工具栏的自定义条目
+    │   │   │   ├── CustomElementsProvider.js # 挂载 Vue 面板到持久宿主
+    │   │   │   ├── CustomElementsPanel.vue   # 自定义元素面板（声明式）
+    │   │   │   ├── PaletteToolbar.vue        # 工具栏收起 / 展开（声明式）
+    │   │   │   └── pagination.css
+    │   │   ├── context/           # contextPad 模块（DI 定义）
+    │   │   ├── i18n/              # translate 模块（DI 定义）
+    │   │   ├── behavior/          # 默认创建行为模块（DI 定义）
+    │   │   ├── renderer/          # 自定义画布元素标签渲染模块（DI 定义）
+    │   │   ├── properties/
+    │   │   │   └── PropertyPanel.vue   # 元素属性编辑面板
+    │   │   └── toolbar/
+    │   │       └── ModelerToolbar.vue  # 顶部工具栏
+    │   └── logic-tree/
+    │       └── index.vue          # 逻辑条件树（v-model，JSX 渲染）
+    ├── api/
+    │   └── customElements.js      # 自定义元素 API 适配层（含 mock 示例）
+    ├── composables/
+    │   └── useToast.js            # 轻提示 hook
+    ├── components/toast/
+    │   └── Toast.vue              # 轻提示组件
+    └── assets/
+        ├── bpmn/
+        │   ├── initial.bpmn       # 示例流程 XML（请假审批流程）
+        │   └── default.bpmn       # 默认流程 XML
+        └── ...
 ```
+
+> 注：核心设计器位于 `src/components/modeler/index.vue`（组件名为 `BpmnModeler`）。各自定义 bpmn-js 模块（palette / context / i18n / behavior / renderer）都通过 `additionalModules` 注入，遵循 `$inject` DI 模式（见 `modeler/index.vue` 的 `initModeler()`）。
 
 ## 核心组件
 
-### BpmnModeler.vue
+### BpmnModeler（`src/components/modeler/index.vue`）
 
 流程设计器核心组件，封装了 bpmn-js Modeler，提供完整的流程设计与编辑能力。
 
@@ -82,9 +96,7 @@ bpmn/
 
 | Prop | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `xml` | `String` | `''` | 要加载的 BPMN XML；为空时加载示例流程 |
-| `title` | `String` | `''` | 设计器顶部标题 |
-| `formData` | `Object` | `{}` | 流程表单元数据（workflowCode、workflowName 等）；支持 `v-model:form-data` 双向绑定 |
+| `formData` | `Object` | `{}` | formBean：流程表单元数据 + `bpmn`（XML）+ `taskInfo`；支持 `v-model:form-data` 双向绑定 |
 
 **Events：**
 
@@ -97,13 +109,12 @@ bpmn/
 
 | 方法 | 说明 |
 | --- | --- |
-| `save(extra)` | 保存当前流程，序列化 XML 并通过 `v-model:form-data` 同步完整 formBean |
-| `getFormBean(extra)` | 不触发保存，直接返回当前状态的 formBean |
-| `getXml()` | 获取最近一次序列化的 XML 字符串 |
-| `taskInfo` | 节点属性数组（ref，唯一数据源） |
+| `save(extra)` | 保存当前流程，记录快照并通过 `v-model:form-data` 同步完整 formBean |
 | `download(type)` | 下载文件，`type` 为 `'xml'` 或 `'svg'` |
 | `undo()` / `redo()` | 撤销 / 重做 |
 | `autoLayout()` | 对流程自动排版并重新导入画布 |
+| `loadFormData(newFormData)` | 用新的 formData 覆盖本地状态并重新加载流程图 |
+| `taskInfo` | 节点属性数组（只读快照） |
 
 ### PropertyPanel.vue
 
@@ -114,15 +125,16 @@ bpmn/
 
 自定义属性仅保存在内存中（taskInfo 数组），不会写入 BPMN XML；标准 `name` 属性会同步回 businessObject 并随 XML 保存。
 
-### App.vue
+### BpmnDesigner.vue（`src/views/`）
 
-页面外壳和数据管理层：
+BPMN 设计器页壳和数据管理层：
 
-- 通过 `v-model:form-data` 双向绑定流程表单元数据
-- 监听 `saved` 事件获取完整的 formBean（bpmn XML + taskInfo + 表单数据）
+- `App.vue` 仅含 `<router-view />`，路由由 `src/router/index.js` 统一管理（`/` → `/bpmn`，另有 `/logic-tree`）
+- 页壳通过 `v-model:form-data` 与设计器双向绑定 `formBean`（workflow 元数据 + `bpmn` + `taskInfo`）
+- 监听 `saved` 事件（保存完成通知，用 toast 提示；数据已由 v-model 自动同步）
 - 未保存修改的提醒由设计器工具栏的"脏标记圆点"承担（见"未保存修改检测"一节）
-- 显示保存成功提示与流程大小信息（KB 单位）
-- 提供全局样式和过渡动画
+- 页面右下角展示流程 XML 大小（KB）与 taskInfo 项数
+- 预留了 `loadFormData` 异步加载示例（默认注释掉）
 
 ## 数据流与持久化
 
@@ -237,8 +249,8 @@ bpmn/
 
 ### 代码位置
 
-- 脏检测与快照：`BpmnModeler.vue` 顶部 `savedSnapshot` / `sameState` / `normalizeBpmn` / `isDirty`
-- 实时状态刷新：`BpmnModeler.vue` 中 `refreshCanvasState()`（`commandStack.changed`、初始化、`autoLayout()` 后调用）
+- 脏检测与快照：`src/components/modeler/index.vue` 顶部 `savedSnapshot` / `sameState` / `normalizeBpmn` / `isDirty`
+- 实时状态刷新：`src/components/modeler/index.vue` 中 `refreshCanvasState()`（`commandStack.changed`、初始化、`autoLayout()` 后调用）
 - 圆点展示：`ModelerToolbar.vue` 的 `:is-dirty` prop 与 `.bpmn-btn-dirty-dot` 样式
 
 ## 只读预览
@@ -258,7 +270,7 @@ bpmn/
 
 ### 代码位置
 
-- `BpmnModeler.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()` / `getActiveCanvas()`，覆盖层样式 `.bpmn-preview-container`
+- `src/components/modeler/index.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()` / `getActiveCanvas()`，覆盖层样式 `.bpmn-preview-container`
 - `ModelerToolbar.vue`：`is-preview` prop、预览按钮高亮与「退出预览」文案、预览模式下禁用编辑类按钮
 
 ## 示例流程
@@ -272,36 +284,49 @@ bpmn/
 
 可直接在页面加载此流程进行编辑和测试。
 
+## 逻辑条件树（LogicTree）
+
+路由 `/logic-tree`（`src/views/LogicTree.vue`）演示独立的「逻辑条件树」组件 `src/components/logic-tree/index.vue`，用于可视化编辑嵌套的条件表达式：
+
+- **节点两类**：`GROUP`（含 `operator` + `children`，可嵌套分组）与 `CONDITION`（叶子：`field` / `operator` / `value`）
+- **无内部状态**：整棵树由外部 `v-model` 持有，组件每层以不可变方式向上提交，回调收到 `null` 表示删除该子节点；根节点（`is-root`）隐藏删除入口
+- **实现注意**：使用 `<script setup lang="jsx">`，通过绑定的 `TreeRender` 函数组件渲染（`script setup` 不能直接 return 渲染函数），`@vitejs/plugin-vue-jsx` 提供 JSX 支持
+- `GROUP_OPERATORS = ['AND', 'OR']`；`CONDITION_OPERATORS = ['EQ','NEQ','GT','GTE','LT','LTE','IN','LIKE']`
+
+```html
+<LogicConditionTree v-model="tree" is-root />
+```
+
 ## 自定义流程
 
 ### 加载流程
 
-通过 `xml` prop 传入自定义 BPMN XML 字符串：
+通过 `v-model:form-data` 传入包含 `bpmn`（XML 字符串，用 `?raw` 导入）、`taskInfo` 与表单元数据的 formBean：
 
 ```vue
 <script setup>
 import { ref } from 'vue'
-import BpmnModeler from './components/BpmnModeler.vue'
+import BpmnModeler from './components/modeler/index.vue'
 import customXml from './flows/my-process.bpmn?raw'
 
-const formData = ref({
+const formBean = ref({
   workflowCode: 'MY_PROCESS',
   workflowName: '我的流程',
   workflowType: 'W',
-  publishedFlag: '1'
+  publishedFlag: '1',
+  bpmn: customXml,
+  taskInfo: []
 })
 
-function handleSaved(formBean) {
-  console.log('保存的流程数据：', formBean)
+function handleSaved() {
+  console.log('保存完成，数据已由 v-model:form-data 同步：', formBean.value)
   // 上传到数据库
 }
 </script>
 
 <template>
   <BpmnModeler
-    :xml="customXml"
-    title="我的流程"
-    v-model:form-data="formData"
+    v-model:form-data="formBean"
     @saved="handleSaved"
   />
 </template>
@@ -309,7 +334,7 @@ function handleSaved(formBean) {
 
 ### 自定义工具栏
 
-在 [src/components/palette/CustomPaletteProvider.js](src/components/palette/CustomPaletteProvider.js) 中定义自定义工具条目。
+在 [src/components/modeler/palette/CustomPaletteProvider.js](src/components/modeler/palette/CustomPaletteProvider.js) 中定义自定义工具条目。
 
 **添加创建元素工具：**
 
@@ -368,7 +393,7 @@ function handleSaved(formBean) {
 
 ### 默认创建行为（DefaultCreateBehavior）
 
-`src/components/behavior/DefaultCreateBehavior.js` 在**新建元素**时统一写入默认属性，当前给 `bpmn:StartEvent` 写入默认 name（"开始"）。从 palette 拖入 / contextPad 追加新建的开始事件会直接显示该名称，且保存时序列化到 XML。
+`src/components/modeler/behavior/DefaultCreateBehavior.js` 在**新建元素**时统一写入默认属性，当前给 `bpmn:StartEvent` 写入默认 name（"开始"）。从 palette 拖入 / contextPad 追加新建的开始事件会直接显示该名称，且保存时序列化到 XML。
 
 **原理：**
 
@@ -468,7 +493,7 @@ function getDisplayText(element) {
 
 **修改分组显示名称：**
 
-编辑 `src/components/i18n/customTranslate.js`：
+编辑 `src/components/modeler/i18n/customTranslate.js`：
 
 ```javascript
 const zhCN = {
@@ -481,7 +506,7 @@ const zhCN = {
 
 **修改默认展开的分组：**
 
-在 `BpmnModeler.vue` 中修改 `accordionPalette` 配置：
+在 `src/components/modeler/index.vue` 中修改 `accordionPalette` 配置：
 
 ```javascript
 accordionPalette: {
@@ -553,7 +578,7 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 
 - **交互**：点击 `<summary>` 标题即切换展开 / 收起，无需任何 JS；`open` 属性控制默认状态，浏览器在开合变化时触发原生 `toggle` 事件，组件用它把状态写回响应式 `Map`，实现翻页 / 搜索后状态保留
 - **兼容性**：所有现代浏览器原生支持（Chrome / Edge / Firefox / Safari，Safari 自 6.0 起），仅 IE11 及更早不支持（已停止维护，可忽略）。且手风琴 palette（`diagram-js-accordion-palette`）内部正是用同一结构渲染各分组，样式类（`.djs-accordion-group`）天然对齐、无需额外适配
-- **样式复用**：`<details>` 与手风琴 palette 分组同款结构，因此分组标题的字体 / 行高等样式（`.djs-accordion-palette .djs-accordion-group summary`）由 `BpmnModeler.vue` 统一控制
+- **样式复用**：`<details>` 与手风琴 palette 分组同款结构，因此分组标题的字体 / 行高等样式（`.djs-accordion-palette .djs-accordion-group summary`）由 `src/components/modeler/index.vue` 统一控制
 
 **架构说明：**
 
@@ -567,14 +592,25 @@ fetchPage({ page, pageSize, keyword }) // keyword 为搜索关键字，可为空
 
 ### Q: 如何加载我自己的 BPMN 流程？
 
-A: 将你的 BPMN XML 文件放在 `src/assets/bpmn/` 目录下，然后在 `App.vue` 中使用 `?raw` 导入：
+A: 将你的 BPMN XML 文件放在 `src/assets/bpmn/` 目录下，并用 `?raw` 导入，通过 `v-model:form-data` 的 `bpmn` 字段传入设计器：
 
 ```javascript
-import myXml from './assets/bpmn/my-flow.bpmn?raw'
+import defaultBpmn from '../assets/bpmn/my-flow.bpmn?raw'
 
-// 然后传入 BpmnModeler 组件
-<BpmnModeler :xml="myXml" />
+const formBean = ref({
+  workflowCode: 'MY_FLOW',
+  workflowName: '我的流程',
+  bpmn: defaultBpmn,
+  taskInfo: []
+})
 ```
+
+```html
+<!-- 传入包含 bpmn / taskInfo / 表单元数据的 formBean -->
+<BpmnModeler v-model:form-data="formBean" />
+```
+
+> 设计器通过 `formData.bpmn`（XML 字符串）加载流程，组件没有单独的 `xml` prop。
 
 ### Q: 自定义属性保存到哪里？
 
@@ -594,7 +630,7 @@ function onSaved(formBean) {
 
 ### Q: 如何添加新的工具到工具栏？
 
-A: 编辑 `src/components/palette/CustomPaletteProvider.js`，在 `getPaletteEntries` 函数返回的对象中添加新条目（参考本文档的"自定义工具栏"部分）。
+A: 编辑 `src/components/modeler/palette/CustomPaletteProvider.js`，在 `getPaletteEntries` 函数返回的对象中添加新条目（参考本文档的"自定义工具栏"部分）。
 
 ### Q: 如何接入后端的自定义元素列表？
 
@@ -610,7 +646,7 @@ A: 通过 `createAction` 函数的第三个参数 `className` 修改，支持 bp
 
 ### Q: 中文翻译在哪里修改？
 
-A: 编辑 `src/components/i18n/customTranslate.js`，在 `zhCN` 对象中添加或覆盖翻译。
+A: 编辑 `src/components/modeler/i18n/customTranslate.js`，在 `zhCN` 对象中添加或覆盖翻译。
 
 ### Q: 属性面板不生效？
 
@@ -624,11 +660,15 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 
 ### 项目依赖的动态加载
 
-`BpmnModeler.vue` 在初始化时使用 `await import()` 动态加载较大的包（如 camunda-bpmn-moddle、diagram-js-accordion-palette），以减小首屏体积。如需修改这些包的版本或功能，请在 `initModeler()` 函数中相应调整。
+`src/components/modeler/index.vue` 在初始化时使用 `await import()` 动态加载较大的包（如 `diagram-js-accordion-palette`、`diagram-js-grid`），以减小首屏体积。如需修改这些包的版本或功能，请在 `initModeler()` 函数中相应调整。
 
 ### Vite 配置
 
-`vite.config.js` 配置了 `.bpmn` 文件的 raw 导入支持，使得 BPMN XML 可以作为纯文本字符串导入，而不经过打包处理。这是为了方便流程文件的管理和版本控制。
+`vite.config.js` 配置了：
+
+- `.bpmn` 文件的 raw 导入支持（`assetsInclude: ['**/*.bpmn']`），使 BPMN XML 可作为纯文本字符串导入（需配合 `?raw` 后缀）
+- `@` 别名指向 `/src`，便捷导入（也可用相对路径）
+- 使用 `@vitejs/plugin-vue` 与 `@vitejs/plugin-vue-jsx`（后者支持如 `logic-tree/index.vue` 的 JSX 组件）
 
 ### 依赖注入架构
 
@@ -724,7 +764,7 @@ eventBus.once('diagram.init', () => this._mount())
 
 ### 1. activeElement 必须使用 shallowRef
 
-`BpmnModeler.vue` 中 `activeElement` 保存的是 bpmn-js 元素对象，**必须用 `shallowRef` 而不是 `ref`**。
+`src/components/modeler/index.vue` 中 `activeElement` 保存的是 bpmn-js 元素对象，**必须用 `shallowRef` 而不是 `ref`**。
 
 bpmn-js 元素含非可配置的属性（如 `labels`），如果用 `ref` 声明，Vue 会把元素深度包装成 `reactive` 代理。调用 `modeling.updateProperties` 时 bpmn-js 内部读取这些属性会抛出：
 
