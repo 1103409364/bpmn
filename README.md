@@ -91,6 +91,7 @@ bpmn/
 | 选中联动 | 显示当前选中元素的 id、类型、属性 |
 | 网格显示 | 画布上的点状网格，便于元素对齐 |
 | 只读预览 | 一键切换到只读预览，画布不可编辑（详见"只读预览"一节） |
+| 条件表达式 | 选中连线可编辑其 `conditionExpression`，落库/导出时以 CDATA 包裹（兼容 Flowable，详见"条件表达式"一节） |
 
 **Props：**
 
@@ -118,12 +119,13 @@ bpmn/
 
 ### PropertyPanel.vue
 
-右侧属性编辑面板，包含两种编辑模式：
+右侧属性编辑面板，包含多种编辑模式：
 
 - **未选中元素时**：编辑流程表单元数据（workflowCode、workflowName、workflowType、publishedFlag 等）
-- **选中元素时**：编辑该元素的自定义属性（xxx、executeType、taskType、handleStrategy 等）
+- **选中流程节点时**：编辑该元素的自定义属性（xxx、executeType、taskType、handleStrategy 等）
+- **选中连线（SequenceFlow）时**：编辑该连线的条件表达式（`conditionExpression.body`，即 UEL 表达式如 `${approved}`）
 
-自定义属性仅保存在内存中（taskInfo 数组），不会写入 BPMN XML；标准 `name` 属性会同步回 businessObject 并随 XML 保存。
+自定义属性仅保存在内存中（taskInfo 数组），不会写入 BPMN XML；标准 `name` 属性会同步回 businessObject 并随 XML 保存；连线的条件表达式会写入 businessObject 并随 XML 保存（CDATA 包裹，详见"条件表达式"一节）。
 
 ### BpmnDesigner.vue（`src/views/`）
 
@@ -272,6 +274,37 @@ BPMN 设计器页壳和数据管理层：
 
 - `src/components/modeler/index.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()` / `getActiveCanvas()`，覆盖层样式 `.bpmn-preview-container`
 - `ModelerToolbar.vue`：`is-preview` prop、预览按钮高亮与「退出预览」文案、预览模式下禁用编辑类按钮
+
+## 条件表达式（SequenceFlow）
+
+选中连线（`bpmn:SequenceFlow`）时，右侧属性面板会显示「条件表达式」输入框，用于编辑该连线的 `conditionExpression` 的 UEL 表达式（如 `${approved}`），常见于排他网关后的条件分支。
+
+### 编辑与写入
+
+- 输入框用本地响应式 `ref` 绑定（`conditionText`）：`businessObject` 是 bpmn-js 的 moddle 对象（非 Vue 响应式），若直接用其 `conditionExpression.body` 做 `:value`，`updateProperties` 改动后 Vue 无法感知，输入会回退。因此改为「选中元素变化时从模型同步一次 + 输入时先更新本地再抛事件」。
+- `index.vue` 的 `onConditionChange()` 通过 `moddle.create('bpmn:FormalExpression', { body })` 创建表达式元素，再用 `modeling.updateProperties(element, { conditionExpression })` 写入——进入命令栈（可撤销），并随 `saveXML` 序列化；表达式清空时移除 `conditionExpression`，避免残留空条件节点。
+
+### CDATA 输出（兼容 Flowable）
+
+bpmn-js 序列化时会把 body 里的 `<`、`>`、`&`、`||` 等特殊字符转义成 `&lt;`、`&gt;`、`&amp;`，可读性差且不直观。而**后端采用 Flowable 时，官方规范与示例推荐用 CDATA 包裹条件表达式**，保证 `${...}` 内的原生字符不被 XML 转义破坏、避免条件判断出错。因此本设计器在保存 / 导出时把 `conditionExpression` 的 body 包裹进 `<![CDATA[...]]>`：
+
+```xml
+<bpmn:sequenceFlow id="Flow_3" sourceRef="ExclusiveGateway_1" targetRef="EndEvent_1">
+  <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression"><![CDATA[${approved}]]></bpmn:conditionExpression>
+</bpmn:sequenceFlow>
+```
+
+实现要点（`src/components/modeler/index.vue`）：
+
+- **统一序列化入口 `serializeBpmn()`**：封装了 `saveXML` + `wrapConditionCdata()`。所有序列化出口（画布刷新存库、自动布局、预览、下载）统一走它，保证条件表达式一致包上 CDATA、后续新增出口不会遗漏。
+- **健壮的正则匹配**：`wrapConditionCdata()` 用带命名空间的回溯引用 `(<prefix:conditionExpression)…</\1>` 匹配标签，同时兼容 `bpmn:` / `flowable:` 前缀，并严格到标签边界避免误匹配其他同名属性。
+- **无损往返**：`wrapConditionCdata()` 先把实体（`&lt;` 等）还原为字面字符再包进 CDATA；重新 `importXML` 时 moddle-xml 会把 CDATA 内容解析回纯文本 body，因此编辑闭环中模型始终保持纯文本，仅在最终输出时包 CDATA。
+- **边界处理**：CDATA 不允许包含 `]]>`，出现时自动拆分为多段 CDATA，保证结果仍是合法 XML。
+
+### 代码位置
+
+- `src/components/modeler/index.vue`：`onConditionChange()` / `serializeBpmn()` / `wrapConditionCdata()` / `decodeXmlEntities()`
+- `src/components/modeler/properties/PropertyPanel.vue`：`isSequenceFlow` / `conditionText` / `updateCondition()`
 
 ## 示例流程
 
@@ -648,6 +681,14 @@ A: 通过 `createAction` 函数的第三个参数 `className` 修改，支持 bp
 
 A: 编辑 `src/components/modeler/i18n/customTranslate.js`，在 `zhCN` 对象中添加或覆盖翻译。
 
+### Q: 如何设置连线的条件表达式？
+
+A: 选中连线（SequenceFlow），在右侧属性面板的「条件表达式」输入框中输入 UEL 表达式（如 `${approved}`）即可。它会写入 `conditionExpression`，保存 / 导出时以 CDATA 包裹（详见"条件表达式"一节）。
+
+### Q: 为什么条件表达式输出会包一层 CDATA？
+
+A: 后端采用 Flowable 时推荐用 CDATA 包裹条件表达式，避免 `${...}` 内的 `<`、`>`、`&`、`||` 等字符被 XML 转义成 `&lt;` 等字面量而破坏条件判断。本设计器通过统一的 `serializeBpmn()` 入口在保存 / 导出时自动包 CDATA，模型内部仍为纯文本、可无损往返。
+
 ### Q: 属性面板不生效？
 
 A: bpmn-js-properties-panel v5 的样式已内嵌在 JS 中，无需额外引入 CSS 文件。
@@ -799,6 +840,10 @@ PropertyPanel 输入框用 `:value` + `@input` 绑定，通过 `taskInfoChange` 
 ### 7. 自定义 palette / i18n 模块要遵循 DI 注入
 
 新增模块（palette、翻译等）需通过 `additionalModules` 注册，并保持 `$inject` 声明的依赖注入写法，否则 bpmn-js 无法解析。
+
+### 8. businessObject 不是 Vue 响应式
+
+bpmn-js 的 `businessObject` 是 moddle 对象，任何对其属性的直接修改 Vue 都无法感知。条件表达式输入框因此用本地响应式 `ref`（`conditionText`）绑定，仅在选中元素变化时从模型同步一次，避免"输入被回退"（详见"条件表达式"一节）。同样的道理也适用于所有直接读写 `businessObject` 的 UI。
 
 ## License
 
