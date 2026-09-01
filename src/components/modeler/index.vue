@@ -390,15 +390,15 @@ async function refreshCanvasState() {
   const nextTaskInfo = syncTaskInfo()
   updateCommandState()
 
-  // B. 异步生成最新的 BPMN XML（条件表达式 body 用 CDATA 包裹，避免特殊字符被转义）
-  const { xml } = await modeler.saveXML({ format: true })
+  // B. 异步生成最新的 BPMN XML（统一序列化，条件表达式 body 用 CDATA 包裹）
+  const { xml } = await serializeBpmn()
   // 丢弃并发编辑时较早的序列化结果，避免旧 XML 覆盖新状态
   if (seq !== canvasEditSeq) return
 
   // C. 【一次性合并更新】并发出【唯一一次 emit】
   const updatedFormData = {
     ...formDataLocal.value,
-    bpmn: wrapConditionCdata(xml),
+    bpmn: xml,
     taskInfo: nextTaskInfo
   }
   
@@ -451,19 +451,30 @@ function decodeXmlEntities(s) {
   return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
 }
 
+// 匹配 conditionExpression 起始标签到结束标签。允许任意命名空间前缀（bpmn: 或 flowable: 等）与属性，
+// 且 tag 名称前后严格到标签边界，避免误伤其他同名属性文本。
+const CONDITION_TAG_RE = /<([A-Za-z_][\w.-]*:conditionExpression)\b[^>]*>([\s\S]*?)<\/\1>/g
+
 /**
- * 把 XML 中 bpmn:conditionExpression 的 body 内容包裹进 CDATA。
- * bpmn-js 序列化时会把 body 里的 <、>、&&、|| 等特殊字符转义成 &lt;、&gt;、&amp;，
- * 生成的可读性很差；CDATA 包裹后原样保留，避免被转义。重新 importXML 时 CDATA 内容会被
- * moddle-xml 正常解析回纯文本 body，可无损往返。
+ * 把 XML 中 conditionExpression 的 body 内容包裹进 CDATA，避免特殊字符（<、>、&&、|| 等）被转义。
+ * 重新 importXML 时 moddle-xml 会把 CDATA 内容解析回纯文本 body，可无损往返。
  */
 function wrapConditionCdata(xml) {
-  return (xml || '').replace(/<bpmn:conditionExpression[^>]*>([\s\S]*?)<\/bpmn:conditionExpression>/g, (match, body) => {
+  return (xml || '').replace(CONDITION_TAG_RE, (match, _tag, body) => {
     const raw = decodeXmlEntities(body)
     // CDATA 不允许包含 "]]>"，出现时拆分为多段 CDATA，保证结果仍是合法 XML
     const safe = raw.replace(/\]\]>/g, ']]]]><![CDATA[>')
     return match.replace(body, '<![CDATA[' + safe + ']]>')
   })
+}
+
+/**
+ * 统一的 BPMN 序列化入口（所有 saveXML 出口都应走这里，保证条件表达式一致地包上 CDATA）。
+ * 返回 { xml } 以兼容 bpmn-js saveXML 的返回形态。
+ */
+async function serializeBpmn() {
+  const { xml } = await modeler.saveXML({ format: true })
+  return { xml: wrapConditionCdata(xml) }
 }
 
 /**
@@ -503,7 +514,7 @@ async function autoLayout() {
       const mod = await import('bpmn-auto-layout')
       layoutProcess = mod.layoutProcess
     }
-    const { xml } = await modeler.saveXML({ format: true })
+    const { xml } = await serializeBpmn()
     const laidOutXml = await layoutProcess(xml)
     await modeler.importXML(laidOutXml)
     // 重新导入会重建元素实例，且命令栈被 clear(false) 清空、不会触发 commandStack.changed，
@@ -530,7 +541,7 @@ async function autoLayout() {
 async function enterPreview() {
   if (!modeler || isPreview.value) return
   try {
-    const { xml } = await modeler.saveXML({ format: true })
+    const { xml } = await serializeBpmn()
 
     // 在画布容器上覆盖一层绝对定位的只读渲染层
     const previewEl = document.createElement('div')
@@ -674,8 +685,8 @@ async function save(extra = {}) {
 // 下载导出
 async function download(type) {
   if (type === 'xml') {
-    const { xml } = await modeler.saveXML({ format: true })
-    downloadBlob(new Blob([wrapConditionCdata(xml)], { type: 'application/xml' }), 'diagram.bpmn')
+    const { xml } = await serializeBpmn()
+    downloadBlob(new Blob([xml], { type: 'application/xml' }), 'diagram.bpmn')
   } else {
     const { svg } = await modeler.saveSVG()
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg')
