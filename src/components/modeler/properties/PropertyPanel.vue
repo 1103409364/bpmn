@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 // 属性编辑器组件：合并了基础信息与节点属性编辑。
 // 选中流程节点时展示并编辑该节点的 taskInfo 条目；未选中时展示并编辑流程表单元数据。
@@ -33,7 +33,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['taskInfoChange', 'baseInfoChange', 'close', 'expand'])
+const emit = defineEmits(['taskInfoChange', 'conditionChange', 'baseInfoChange', 'close', 'expand'])
 
 // 类型展示名（去掉 bpmn: 前缀）
 const typeName = computed(() => (props.element?.businessObject?.$type || '').replace('bpmn:', ''))
@@ -56,6 +56,27 @@ const BASIC_FIELDS = [
   { key: 'version', label: '版本号' },
   { key: 'newFlag', label: '新建标志' }
 ]
+
+// 当前选中的元素是否为 SequenceFlow（连线），条件表达式只针对连线
+const isSequenceFlow = computed(() => props.element?.type === 'bpmn:SequenceFlow')
+
+// 条件表达式输入框的本地值。businessObject 是 bpmn-js 内部的 moddle 对象（非 Vue 响应式），
+// 直接用其 conditionExpression.body 做 :value 绑定，updateProperties 改动后 Vue 无法感知 → 输入会回退。
+// 因此改用本地响应式 ref：选中元素变化时从模型同步一次，输入时先更新本地再抛给父组件，保证可正常键入。
+const conditionText = ref('')
+
+watch(
+  () => props.element,
+  (el) => {
+    conditionText.value = el?.businessObject?.conditionExpression?.body ?? ''
+  },
+  { immediate: true }
+)
+
+function updateCondition(value) {
+  conditionText.value = value
+  emit('conditionChange', value)
+}
 
 // 各元素类型可编辑的字段配置
 const TASK_FIELDS = {
@@ -112,7 +133,20 @@ function updateFormField(key, value) {
             </div>
           </div>
           <div class="panel-fields">
-            <template v-if="entry">
+            <template v-if="isSequenceFlow">
+              <div class="panel-field">
+                <label class="panel-label">条件表达式</label>
+                <input
+                  class="panel-input"
+                  :class="{ 'panel-input-disabled': readonly }"
+                  :value="conditionText"
+                  :disabled="readonly"
+                  placeholder="如 ${approved}"
+                  @input="updateCondition($event.target.value)"
+                />
+              </div>
+            </template>
+            <template v-else-if="entry">
               <div v-for="field in taskFields" :key="field.key" class="panel-field">
                 <label class="panel-label">{{ field.label }}</label>
                 <input

@@ -390,7 +390,7 @@ async function refreshCanvasState() {
   const nextTaskInfo = syncTaskInfo()
   updateCommandState()
 
-  // B. 异步生成最新的 BPMN XML
+  // B. 异步生成最新的 BPMN XML（条件表达式 body 用 CDATA 包裹，避免特殊字符被转义）
   const { xml } = await modeler.saveXML({ format: true })
   // 丢弃并发编辑时较早的序列化结果，避免旧 XML 覆盖新状态
   if (seq !== canvasEditSeq) return
@@ -398,7 +398,7 @@ async function refreshCanvasState() {
   // C. 【一次性合并更新】并发出【唯一一次 emit】
   const updatedFormData = {
     ...formDataLocal.value,
-    bpmn: xml,
+    bpmn: wrapConditionCdata(xml),
     taskInfo: nextTaskInfo
   }
   
@@ -426,6 +426,44 @@ function onTaskInfoChange({ key, value }) {
     // 走 modeling.updateProperties 让节点标签刷新并进入撤销栈（其后 commandStack.changed 会刷新实时状态）
     modeler.get('modeling').updateProperties(element, { name: value })
   }
+}
+
+/**
+ * 属性面板 conditionChange 事件处理：设置选中 SequenceFlow 的 conditionExpression.body。
+ * UEL 表达式（如 ${approved}）通过 body 写入 bpmn:FormalExpression 元素（language 保持为空即 UEL 约定），
+ * 走 modeling.updateProperties 使其进入命令栈、可撤销，并随 XML 一并序列化保存。
+ * 表达式为空时移除 conditionExpression，避免残留空条件节点。
+ */
+function onConditionChange(value) {
+  const element = activeElement.value
+  if (!element || element.type !== 'bpmn:SequenceFlow' || isPreview.value) return
+  const body = (value || '').trim()
+  const moddle = modeler.get('moddle')
+  let conditionExpression
+  if (body) {
+    conditionExpression = moddle.create('bpmn:FormalExpression', { body })
+  }
+  modeler.get('modeling').updateProperties(element, { conditionExpression })
+}
+
+// 把 XML 实体（&lt; &gt; &amp; &quot; &apos;）还原为字面字符，供 CDATA 包裹时使用
+function decodeXmlEntities(s) {
+  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+}
+
+/**
+ * 把 XML 中 bpmn:conditionExpression 的 body 内容包裹进 CDATA。
+ * bpmn-js 序列化时会把 body 里的 <、>、&&、|| 等特殊字符转义成 &lt;、&gt;、&amp;，
+ * 生成的可读性很差；CDATA 包裹后原样保留，避免被转义。重新 importXML 时 CDATA 内容会被
+ * moddle-xml 正常解析回纯文本 body，可无损往返。
+ */
+function wrapConditionCdata(xml) {
+  return (xml || '').replace(/<bpmn:conditionExpression[^>]*>([\s\S]*?)<\/bpmn:conditionExpression>/g, (match, body) => {
+    const raw = decodeXmlEntities(body)
+    // CDATA 不允许包含 "]]>"，出现时拆分为多段 CDATA，保证结果仍是合法 XML
+    const safe = raw.replace(/\]\]>/g, ']]]]><![CDATA[>')
+    return match.replace(body, '<![CDATA[' + safe + ']]>')
+  })
 }
 
 /**
@@ -637,7 +675,7 @@ async function save(extra = {}) {
 async function download(type) {
   if (type === 'xml') {
     const { xml } = await modeler.saveXML({ format: true })
-    downloadBlob(new Blob([xml], { type: 'application/xml' }), 'diagram.bpmn')
+    downloadBlob(new Blob([wrapConditionCdata(xml)], { type: 'application/xml' }), 'diagram.bpmn')
   } else {
     const { svg } = await modeler.saveSVG()
     downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'diagram.svg')
@@ -704,6 +742,7 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
         :collapsed="!panelVisible"
         :readonly="isPreview"
         @taskInfoChange="onTaskInfoChange"
+        @conditionChange="onConditionChange"
         @baseInfoChange="updateFormDataLocal"
         @close="panelVisible = false"
         @expand="panelVisible = true"
