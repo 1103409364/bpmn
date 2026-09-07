@@ -66,6 +66,14 @@ const pkgJsonPath = path.join(__dirname, "package.json");
 const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
 const tgzFiles = fs.readdirSync(outputDir).filter((f) => f.endsWith(".tgz"));
 
+// 从 tgz 文件名还原真实包名（npm pack 规范：<name>-<version>.tgz）
+// 例如 vue-codemirror-6.1.1.tgz -> vue-codemirror
+function tgzToPackageName(file) {
+  const base = file.replace(/\.tgz$/, "");
+  const match = base.match(/^(.*)-(\d+\.\d+\.\d+(?:[-+][\w.-]+)?)$/);
+  return match ? match[1] : null;
+}
+
 // 匹配并替换依赖版本的函数
 function updateDeps(depsObj) {
   if (!depsObj) return;
@@ -74,9 +82,9 @@ function updateDeps(depsObj) {
     // 处理带作用域的包，如 @bpmn-io/element-template-chooser -> bpmn-io-element-template-chooser
     const sanitizedName = depName.replace(/^@/, "").replace(/\//g, "-");
 
-    // 寻找以该包名开头的 .tgz 文件
-    const matchedTgz = tgzFiles.find((file) =>
-      file.startsWith(`${sanitizedName}-`),
+    // 精准匹配包名（不能用 startsWith 前缀匹配，否则 vue 会错误命中 vue-codemirror-*.tgz）
+    const matchedTgz = tgzFiles.find(
+      (file) => tgzToPackageName(file) === sanitizedName,
     );
 
     if (matchedTgz) {

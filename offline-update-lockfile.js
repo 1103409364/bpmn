@@ -29,11 +29,20 @@ if (tgzFiles.length === 0) {
 
 console.log(`📁 成功扫描到 ${tgzFiles.length} 个离线包文件\n`);
 
-// 工具函数：根据包名模糊/精准匹配对应的 tgz 文件名
+// 工具函数：从 tgz 文件名还原真实包名（npm pack 规范：<name>-<version>.tgz）
+// 例如 vue-codemirror-6.1.1.tgz -> vue-codemirror
+function tgzToPackageName(file) {
+  const base = file.replace(/\.tgz$/, "");
+  const match = base.match(/^(.*)-(\d+\.\d+\.\d+(?:[-+][\w.-]+)?)$/);
+  return match ? match[1] : null;
+}
+
+// 工具函数：根据包名精准匹配对应的 tgz 文件名
+// 注意：不能用 startsWith 前缀匹配，否则 vue 会错误命中 vue-codemirror-*.tgz
 function findMatchedTgz(pkgName) {
   // 处理作用域包名（如 @bpmn-io/diagram-js-ui -> bpmn-io-diagram-js-ui）
   const sanitizedName = pkgName.replace(/^@/, "").replace(/\//g, "-");
-  return tgzFiles.find((file) => file.startsWith(`${sanitizedName}-`));
+  return tgzFiles.find((file) => tgzToPackageName(file) === sanitizedName);
 }
 
 // 3. 读取并更新 package-lock.json

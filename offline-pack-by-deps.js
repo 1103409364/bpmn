@@ -8,11 +8,11 @@ const __dirname = path.dirname(__filename);
 
 // 1. 指定你需要离线化的顶层主依赖列表
 const targetPackageNames = [
-  "bpmn-auto-layout",
-  "bpmn-js",
-  "bpmn-js-i18n-zh",
-  "diagram-js-accordion-palette",
-  "diagram-js-grid",
+  "@codemirror/lang-javascript",
+  "@codemirror/lang-xml",
+  "@codemirror/language",
+  "@codemirror/legacy-modes",
+  "vue-codemirror",
 ];
 
 const lockFilePath = path.join(__dirname, "package-lock.json");
