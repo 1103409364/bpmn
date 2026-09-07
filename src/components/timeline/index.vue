@@ -29,6 +29,7 @@ const handleViewDetail = (item) => {
 
 <style scoped>
 .timeline {
-  padding: 16px 0;
+  padding: 16px 0 8px;
+  position: relative;
 }
 </style>
