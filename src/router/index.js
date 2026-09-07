@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import BpmnDesigner from '../views/BpmnDesigner.vue'
 import LogicTree from '../views/LogicTree.vue'
+import CmdDemo from '../views/CmdDemo.vue'
 
 const routes = [
   { path: '/', redirect: '/bpmn' },
@@ -13,6 +14,11 @@ const routes = [
     path: '/logic-tree',
     name: 'LogicTree',
     component: LogicTree
+  },
+  {
+    path: '/cm-demo',
+    name: 'CmdDemo',
+    component: CmdDemo
   }
 ]
 
