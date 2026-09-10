@@ -52,6 +52,7 @@ bpmn/
     │   │   ├── i18n/              # translate 模块（DI 定义）
     │   │   ├── behavior/          # 默认创建行为模块（DI 定义）
     │   │   ├── renderer/          # 自定义画布元素标签渲染模块（DI 定义）
+    │   │   ├── readOnly/          # 只读模式模块（DI 定义）
     │   │   ├── properties/
     │   │   │   └── PropertyPanel.vue   # 元素属性编辑面板
     │   │   └── toolbar/
@@ -90,7 +91,7 @@ bpmn/
 | 未保存提醒 | 工具栏保存按钮显示脏标记圆点，提示存在未保存的修改（详见"未保存修改检测"一节） |
 | 选中联动 | 显示当前选中元素的 id、类型、属性 |
 | 网格显示 | 画布上的点状网格，便于元素对齐 |
-| 只读预览 | 一键切换到只读预览，画布不可编辑（详见"只读预览"一节） |
+| 只读模式 | 通过自定义 `readOnlyModule` 拦截所有编辑操作，一键切换到只读查看（详见"只读模式"一节） |
 | 条件表达式 | 选中连线可编辑其 `conditionExpression`，落库/导出时以 CDATA 包裹（兼容 Flowable，详见"条件表达式"一节） |
 
 **Props：**
@@ -255,24 +256,28 @@ BPMN 设计器页壳和数据管理层：
 - 实时状态刷新：`src/components/modeler/index.vue` 中 `refreshCanvasState()`（`commandStack.changed`、初始化、`autoLayout()` 后调用）
 - 圆点展示：`ModelerToolbar.vue` 的 `:is-dirty` prop 与 `.bpmn-btn-dirty-dot` 样式
 
-## 只读预览
+## 只读模式
 
-工具栏的「预览」按钮用于把流程切换到**只读预览模式**，与「收起面板」这类纯视图操作不同，预览模式真正禁止一切编辑。
+工具栏的「预览」按钮用于把流程切换到**只读模式**，与「收起面板」这类纯视图操作不同，只读模式真正禁止一切编辑。
 
 ### 实现原理
 
-预览模式在画布上覆盖一层 bpmn-js 的 `NavigatedViewer`（`bpmn-js/lib/NavigatedViewer`）：
+只读模式通过自定义 bpmn-js DI 模块 `readOnlyModule`（`src/components/modeler/readOnly/`）实现：
 
-- `NavigatedViewer` 只注册渲染与导航服务，**不注册** palette、contextPad、modeling、editorActions 等编辑服务，因此元素无法拖动、无法增删改、无法连线，天然满足「不可编辑」
-- 内置 `movecanvas` / `zoomscroll` / `keyboard-move` 导航模块：支持**鼠标拖动画布平移**与滚轮缩放（纯 `Viewer` 只能通过空格键平移）
-- 进入预览前先用 `modeler.saveXML()` 序列化当前画布最新 XML，保证预览内容与编辑态实时一致
-- 覆盖层遮住左侧 palette 与网格；右侧属性面板**保持显示但置为只读**（输入框禁用，仅可查看），点击预览层节点时面板同步展示对应节点属性
-- 预览模式下工具栏的撤销/重做、自动布局、保存按钮被禁用；缩放/适应按钮仍可用（作用于 Viewer）
-- 退出预览时销毁 Viewer 覆盖层，属性面板恢复可编辑状态
+- `ReadOnly` 服务通过 `$inject` 注入 `eventBus`、`contextPad`、`palette`、`directEditing`，调用 `setReadOnly(true)` 切换状态
+- 高优先级（10000）拦截 `element.dblclick`、`shape.move.start`、`create.start`、`connect.start`、`resize.start` 五类编辑事件，阻止双击编辑文字、拖拽移动/创建节点、连线、调整大小
+- 进入只读时自动收起 Palette、关闭 ContextPad、取消正在进行的文字编辑
+- 只读状态下通过 CSS 隐藏左侧 Palette（`.djs-accordion-palette`）和节点 ContextPad（`.djs-context-pad`）
+- 右侧属性面板**保持显示但置为只读**（输入框禁用，仅可查看），点击节点时面板同步展示对应节点属性
+- 画布的缩放与平移（`movecanvas` / `zoomscroll`）仍可用，与编辑模式一致
+- 退出只读时调用 `setReadOnly(false)`，恢复所有编辑能力
+- 模块通过 `additionalModules` 注入 Modeler，遵循 bpmn-js 标准 DI 模式
 
 ### 代码位置
 
-- `src/components/modeler/index.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()` / `getActiveCanvas()`，覆盖层样式 `.bpmn-preview-container`
+- `src/components/modeler/readOnly/ReadOnly.js`：只读服务（事件拦截 + UI 联动）
+- `src/components/modeler/readOnly/index.js`：模块定义（DI 注册）
+- `src/components/modeler/index.vue`：`enterPreview()` / `exitPreview()` / `togglePreview()`，CSS 样式 `.bpmn-read-only`
 - `ModelerToolbar.vue`：`is-preview` prop、预览按钮高亮与「退出预览」文案、预览模式下禁用编辑类按钮
 
 ## 条件表达式（SequenceFlow）
@@ -460,7 +465,7 @@ this.preExecute('shape.create', (event) => {
 
 ### 自定义元素渲染（CustomRenderer）
 
-`src/components/modeler/renderer/CustomRenderer.js` 自定义**画布上元素的展示内容**：默认情况下图形内文字直接取 `businessObject.name`，本模块可改为任意规则（如 ServiceTask 图标内展示 `name(busId)`），并演示了三种视觉扩展方式（SVG / HTML / 交互层）。编辑态与只读预览的 `NavigatedViewer` 都挂载了该模块，两边展示一致。
+`src/components/modeler/renderer/CustomRenderer.js` 自定义**画布上元素的展示内容**：默认情况下图形内文字直接取 `businessObject.name`，本模块可改为任意规则（如 ServiceTask 图标内展示 `name(busId)`），并演示了三种视觉扩展方式（SVG / HTML / 交互层）。编辑态与只读模式的画布展示一致。
 
 **原理：**
 
@@ -713,7 +718,7 @@ A: 需要在 `vite.config.js` 中配置 `assetsInclude: ['**/*.bpmn']`，并以 
 
 ### 依赖注入架构
 
-bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、contextPadModule、translateModule、defaultCreateBehaviorModule、customRendererModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
+bpmn-js 内部使用了依赖注入 (IoC) 架构。所有功能（canvas、eventBus、selection 等）都以 service 的形式注册，可通过 `modeler.get('serviceId')` 获取。自定义模块（paletteModule、contextPadModule、translateModule、defaultCreateBehaviorModule、customRendererModule、readOnlyModule 等）通过 `additionalModules` 参数注入，遵循相同的 DI 模式。
 
 ### 非 Vue 组件接入 Vue 的重构技巧（palette 实战）
 
