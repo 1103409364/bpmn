@@ -100,10 +100,8 @@ function sameState(a, b) {
 const isDirty = computed(() => !sameState(formDataLocal.value, savedSnapshot.value))
 // 右侧属性面板显示/隐藏状态
 const panelVisible = ref(true)
-// 是否处于只读预览模式：true 时画布覆盖只读 Viewer，禁止一切编辑操作
+// 是否处于只读模式：true 时 readOnly 模块拦截所有编辑操作，Palette / ContextPad 隐藏
 const isPreview = ref(false)
-// 预览用的只读 Viewer 实例（bpmn-js 的 Viewer 只做渲染/缩放/平移，无建模能力）
-let previewViewer = null
 
 /**
  * 核心导入逻辑：把 XML 载入 modeler 实例
@@ -157,6 +155,8 @@ async function initModeler() {
   const { default: accordionPaletteModule } = await import('diagram-js-accordion-palette')
   // 视觉网格模块：在画布上显示点状网格（SVG 实现，无需引入样式）
   const { default: gridModule } = await import('diagram-js-grid')
+  // 只读模式模块：拦截编辑操作，隐藏 Palette / ContextPad
+  const { readOnlyModule } = await import('./readOnly/index')
 
   // 创建 modeler 实例：
   modeler = new BpmnModeler({
@@ -170,7 +170,8 @@ async function initModeler() {
       accordionPaletteModule,
       gridModule,
       defaultCreateBehaviorModule,
-      customRendererModule
+      customRendererModule,
+      readOnlyModule
     ],
     // accordionPalette: 手风琴 palette 的配置
     accordionPalette: {
@@ -275,7 +276,7 @@ function findUpstreamServiceTaskIds(serviceTaskId) {
  */
 async function loadFormData(newFormData) {
   if (!newFormData) return
-  // 重新加载数据前先退出预览，避免覆盖层继续展示旧流程
+  // 重新加载数据前先退出只读模式，确保编辑态正常
   exitPreview()
   await applyFormData(newFormData)
   // 主动更新数据后重置快照，消除脏标记
@@ -529,90 +530,36 @@ async function autoLayout() {
 }
 
 /**
- * 进入只读预览：在画布上覆盖一层 bpmn-js NavigatedViewer。
- * Viewer 系列只负责渲染与导航（缩放/平移），不注册 palette / contextPad / modeling 等编辑服务，
- * 因此元素无法拖动、无法增删改，天然满足"不可编辑"。
- * 使用 NavigatedViewer 而非纯 Viewer：它内置 movecanvas / zoomscroll / keyboard-move 导航模块，
- * 支持鼠标拖动画布平移与滚轮缩放（纯 Viewer 只能通过空格键平移）。
- * - 先序列化当前画布最新 XML，保证预览内容与编辑态实时一致
- * - 属性面板保持显示但置为只读（输入框禁用），palette 收起
- * - 清空 modeler 的选中态，防止退出预览后残留高亮
+ * 切换只读模式：调用 readOnly 模块的 setReadOnly，
+ * 由模块内部拦截编辑操作并联动 Palette / ContextPad 显隐。
+ * 属性面板的 readonly 状态由 :readonly="isPreview" 控制。
+ */
+function togglePreview() {
+  if (!modeler) return
+  const readOnly = !isPreview.value
+  isPreview.value = readOnly
+  modeler.get('readOnly').setReadOnly(readOnly)
+}
+
+/**
+ * 退出只读模式（供外部调用）。
+ */
+function exitPreview() {
+  if (!isPreview.value || !modeler) return
+  isPreview.value = false
+  modeler.get('readOnly').setReadOnly(false)
+}
+
+/**
+ * 进入只读模式（供外部调用）。
  */
 async function enterPreview() {
   if (!modeler || isPreview.value) return
-  try {
-    const { xml } = await serializeBpmn()
-
-    // 在画布容器上覆盖一层绝对定位的只读渲染层
-    const previewEl = document.createElement('div')
-    previewEl.className = 'bpmn-preview-container'
-    canvasRef.value.appendChild(previewEl)
-
-    if (previewViewer) previewViewer.destroy()
-    const { default: BpmnViewer } = await import('bpmn-js/lib/NavigatedViewer')
-    // 预览层挂载与编辑态一致的自定义渲染模块，保证标签展示内容相同（模块会被缓存，无重复加载开销）
-    const { customRendererModule } = await import('./renderer/index')
-    previewViewer = new BpmnViewer({ container: previewEl, additionalModules: [customRendererModule] })
-    await previewViewer.importXML(xml)
-
-    // 同步预览层选中到 activeElement，让只读属性面板能跟随点击展示对应节点属性
-    previewViewer.get('eventBus').on('selection.changed', ({ newSelection }) => {
-      activeElement.value = (newSelection && newSelection[0]) || null
-    })
-
-    const canvas = previewViewer.get('canvas')
-    canvas.zoom('fit-viewport', 'auto')
-
-    // 清空编辑态选中，避免下层 modeler 的高亮框透过半透明区域露出来
-    modeler.get('selection').select(null)
-    // 收起编辑用 palette
-    const palette = modeler.get('palette')
-    if (palette && palette.isOpen()) palette.close()
-
-    isPreview.value = true
-  } catch (err) {
-    console.error('进入预览失败:', err)
-    exitPreview()
-  }
+  isPreview.value = true
+  modeler.get('readOnly').setReadOnly(true)
 }
 
-/**
- * 退出只读预览：销毁 Viewer 覆盖层，恢复编辑态。
- */
-function exitPreview() {
-  if (!isPreview.value) return
-  if (previewViewer) {
-    previewViewer.destroy()
-    previewViewer = null
-  }
-  const previewEl = canvasRef.value && canvasRef.value.querySelector('.bpmn-preview-container')
-  if (previewEl) previewEl.remove()
-
-  isPreview.value = false
-
-  // 覆盖层移除后，重新校正下层 modeler 的视口尺寸
-  if (modeler) {
-    const canvas = modeler.get('canvas')
-    canvas.resized()
-  }
-}
-
-function togglePreview() {
-  if (isPreview.value) {
-    exitPreview()
-  } else {
-    enterPreview()
-  }
-}
-
-/**
- * 当前实际可见画布的 canvas 服务：
- * 预览模式下工具栏缩放作用于只读 Viewer，编辑模式下作用于 modeler
- */
 function getActiveCanvas() {
-  if (isPreview.value && previewViewer) {
-    return previewViewer.get('canvas')
-  }
   return modeler.get('canvas')
 }
 
@@ -710,12 +657,8 @@ onMounted(async () => {
 })
 
 
-// 组件销毁时释放 modeler 与预览 viewer 实例，避免内存泄漏和事件残留
+// 组件销毁时释放 modeler 实例，避免内存泄漏和事件残留
 onBeforeUnmount(() => {
-  if (previewViewer) {
-    previewViewer.destroy()
-    previewViewer = null
-  }
   if (modeler) modeler.destroy()
 })
 
@@ -743,7 +686,7 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
       @download="download"
       @save="save"
     />
-    <div class="bpmn-body" :class="{ 'bpmn-previewing': isPreview }">
+    <div class="bpmn-body" :class="{ 'bpmn-read-only': isPreview }">
       <div class="bpmn-canvas" ref="canvasRef"></div>
       <PropertyPanel
         v-if="modelerReady"
@@ -829,20 +772,15 @@ defineExpose({ save, download, undo, redo, autoLayout, taskInfo, loadFormData })
   background: #ecfdf5;
 }
 
-/* ---------- 只读预览覆盖层 ---------- */
-/* 覆盖整个画布，遮住 palette、网格与下层可编辑 modeler，
-   bpmn-js 的 DOM 是动态注入的，样式需放在非 scoped 块中 */
-.bpmn-preview-container {
-  position: absolute;
-  inset: 0;
-  z-index: 60;
-  background: #f3f4f6;
-  cursor: default;
+/* ---------- 只读模式：隐藏 Palette 和 ContextPad ---------- */
+/* bpmn-js 的 DOM 是动态注入的，样式需放在非 scoped 块中 */
+.bpmn-read-only .djs-accordion-palette,
+.bpmn-read-only .djs-palette {
+  display: none;
 }
 
-/* 预览模式下隐藏左侧 palette（含收起手柄），避免其浮动在覆盖层之上 */
-.bpmn-previewing .djs-accordion-palette {
-  display: none;
+.bpmn-read-only .djs-context-pad {
+  display: none !important;
 }
 
 /* ---------- 手风琴 palette 收起/展开 ---------- */
